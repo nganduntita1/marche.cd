@@ -10,10 +10,11 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Camera, X } from 'lucide-react-native';
+import { Camera, X, ChevronDown } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,7 +28,8 @@ export default function PostScreen() {
   const [categoryId, setCategoryId] = useState('');
   const [condition, setCondition] = useState<ListingCondition>('good');
   const [imageUris, setImageUris] = useState<string[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  // const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { user } = useAuth();
@@ -109,8 +111,16 @@ export default function PostScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!title || !description || !price || !location || !categoryId) {
-      setError('Veuillez remplir tous les champs obligatoires');
+    // Vérification détaillée des champs obligatoires
+    const missingFields = [];
+    if (!title) missingFields.push('titre');
+    if (!description) missingFields.push('description');
+    if (!price) missingFields.push('prix');
+    if (!location) missingFields.push('localisation');
+    if (!categoryId) missingFields.push('catégorie');
+    
+    if (missingFields.length > 0) {
+      setError(`Veuillez remplir les champs obligatoires suivants: ${missingFields.join(', ')}`);
       return;
     }
 
@@ -139,14 +149,14 @@ export default function PostScreen() {
         condition,
         images: uploadedImageUrls,
         seller_id: user.id,
-        status: 'pending',
+        status: 'active', // Auto-activate listings for better user experience
       });
 
       if (insertError) throw insertError;
 
       Alert.alert(
         'Succès',
-        'Votre annonce a été soumise et sera publiée après modération',
+        'Votre annonce a été publiée avec succès!',
         [
           {
             text: 'OK',
@@ -169,6 +179,8 @@ export default function PostScreen() {
       setLoading(false);
     }
   };
+
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const conditions: { value: ListingCondition; label: string }[] = [
     { value: 'new', label: 'Neuf' },
@@ -222,6 +234,9 @@ export default function PostScreen() {
               placeholder="Ex: iPhone 13 Pro Max 256GB"
               value={title}
               onChangeText={setTitle}
+              returnKeyType="next"
+              autoCapitalize="sentences"
+              maxLength={100}
             />
           </View>
 
@@ -235,6 +250,7 @@ export default function PostScreen() {
               multiline
               numberOfLines={4}
               textAlignVertical="top"
+              maxLength={1000}
             />
           </View>
 
@@ -244,8 +260,10 @@ export default function PostScreen() {
               style={styles.input}
               placeholder="Ex: 500000"
               value={price}
-              onChangeText={setPrice}
+              onChangeText={(text) => setPrice(text.replace(/[^0-9]/g, ''))}
               keyboardType="numeric"
+              returnKeyType="next"
+              maxLength={10}
             />
           </View>
 
@@ -256,33 +274,75 @@ export default function PostScreen() {
               placeholder="Ex: Kinshasa, Gombe"
               value={location}
               onChangeText={setLocation}
+              returnKeyType="next"
+              autoCapitalize="words"
+              maxLength={50}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Catégorie *</Text>
-            <View style={styles.chipContainer}>
-              {categories.map(cat => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[
-                    styles.chip,
-                    categoryId === cat.id && styles.chipActive,
-                  ]}
-                  onPress={() => setCategoryId(cat.id)}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      categoryId === cat.id && styles.chipTextActive,
-                    ]}
-                  >
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+  <Text style={styles.label}>Catégorie *</Text>
+  <TouchableOpacity
+    style={[styles.input, styles.selectInput]}
+    onPress={() => setCategoryPickerVisible(true)}
+  >
+    <Text style={categoryId ? styles.selectValueText : styles.selectPlaceholderText}>
+      {categoryId ? (categories.find(c => c.id.toString() === categoryId.toString())?.name || 'Sélectionnez une catégorie') : 'Sélectionnez une catégorie'}
+    </Text>
+    <ChevronDown size={18} color="#64748b" />
+  </TouchableOpacity>
+
+  <Modal
+    visible={categoryPickerVisible}
+    animationType="slide"
+    transparent
+    onRequestClose={() => setCategoryPickerVisible(false)}
+  >
+    <TouchableOpacity 
+      style={styles.modalOverlay}
+      activeOpacity={1}
+      onPress={() => setCategoryPickerVisible(false)}
+    >
+      <TouchableOpacity 
+        style={styles.modalContent}
+        activeOpacity={1}
+        onPress={(e) => e.stopPropagation()}
+      >
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Choisir une catégorie</Text>
+          <TouchableOpacity onPress={() => setCategoryPickerVisible(false)}>
+            <X size={20} color="#0f172a" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.modalList}>
+          {categories.map(cat => (
+            <TouchableOpacity
+              key={cat.id}
+              style={[
+                styles.modalItem,
+                categoryId && cat.id && categoryId.toString() === cat.id.toString() && { backgroundColor: '#f0fdf4', borderColor: '#16a34a' },
+              ]}
+              onPress={() => {
+                setCategoryId(cat.id);
+                setCategoryPickerVisible(false);
+              }}
+            >
+              <Text style={styles.modalItemText}>{cat.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <TouchableOpacity
+          style={styles.modalCloseButton}
+          onPress={() => setCategoryPickerVisible(false)}
+        >
+          <Text style={{ color: '#fff', fontWeight: '600' }}>Fermer</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  </Modal>
+</View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>État *</Text>
@@ -333,6 +393,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 40, // Ajoute plus d'espace en bas pour éviter que le contenu soit coupé
   },
   title: {
     fontSize: 28,
@@ -356,8 +417,10 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
-    width: 100,
-    height: 100,
+    width: '30%',
+    aspectRatio: 1,
+    marginBottom: 8,
+    marginRight: '3%',
   },
   image: {
     width: '100%',
@@ -407,10 +470,79 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+    width: '100%',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0f172a',
+  },
+  modalList: {
+    maxHeight: 300,
+  },
+  modalItem: {
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: '#0f172a',
+  },
+  modalCloseButton: {
+    marginTop: 16,
+    backgroundColor: '#16a34a',
+    paddingVertical: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  selectInput: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 4,
+  },
+  selectValueText: {
+    fontSize: 16,
+    color: '#0f172a',
+  },
+  selectPlaceholderText: {
+    fontSize: 16,
+    color: '#94a3b8',
   },
   textArea: {
-    minHeight: 100,
+    minHeight: 120,
     paddingTop: 12,
+    textAlignVertical: 'top',
   },
   chipContainer: {
     flexDirection: 'row',
@@ -439,15 +571,17 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 20,
+    marginBottom: 30,
+    width: '100%',
   },
   submitButtonDisabled: {
     opacity: 0.6,
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   errorContainer: {
     backgroundColor: '#fef2f2',

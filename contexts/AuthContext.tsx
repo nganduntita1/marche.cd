@@ -63,25 +63,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string, location: string) => {
     try {
+      // First, sign up the user with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            name,
+            location,
+          },
+        },
       });
 
       if (error) throw error;
 
+      // The user profile will be created automatically via a trigger
+      // But we'll also try to create it manually as a fallback
       if (data.user) {
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: data.user.id,
-            name,
-            phone: email,
-            email,
-            location,
-          });
-
-        if (profileError) throw profileError;
+        try {
+          const { error: profileError } = await supabase
+            .from('users')
+            .insert({
+              id: data.user.id,
+              name,
+              phone: email,
+              email,
+              location,
+            });
+            
+          if (profileError) {
+            console.log('Note: Profile creation via insert failed, but this is expected if the trigger created it:', profileError.message);
+          }
+        } catch (profileErr) {
+          console.log('Profile creation fallback failed, but auth succeeded:', profileErr);
+        }
       }
     } catch (error: any) {
       throw new Error(error.message || 'Error creating account');
@@ -90,12 +105,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
+      if (data.session?.user) {
+        await loadUserProfile(data.session.user.id);
+      }
     } catch (error: any) {
       throw new Error(error.message || 'Error signing in');
     }
