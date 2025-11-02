@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,57 +8,41 @@ import {
   ScrollView,
   Image,
   Alert,
-  ActivityIndicator,
-  Platform,
   Modal,
+  FlatList,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Camera, X, ChevronDown } from 'lucide-react-native';
+import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
-import { Category, ListingCondition } from '@/types/database';
+import * as FileSystem from 'expo-file-system';
 
 export default function PostScreen() {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [location, setLocation] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [condition, setCondition] = useState<ListingCondition>('good');
-  const [imageUris, setImageUris] = useState<string[]>([]);
-  // const [categories, setCategories] = useState<Category[]>([]);
-  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const { user } = useAuth();
   const router = useRouter();
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
 
-  useEffect(() => {
-    loadCategories();
-    if (user?.location) {
-      setLocation(user.location);
-    }
-  }, [user]);
+  const categories = [
+    { label: 'Téléphones', value: 'telephones' },
+    { label: 'Véhicules', value: 'vehicules' },
+    { label: 'Électronique', value: 'electronique' },
+    { label: 'Maison & Jardin', value: 'maison-jardin' },
+    { label: 'Mode & Beauté', value: 'mode-beaute' },
+    { label: 'Emplois', value: 'emplois' },
+    { label: 'Services', value: 'services' },
+    { label: 'Immobilier', value: 'immobilier' }
+  ];
 
-  const loadCategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setCategories(data || []);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    }
-  };
-
-  const pickImage = async () => {
-    if (imageUris.length >= 5) {
-      Alert.alert('Limite atteinte', 'Vous pouvez ajouter jusqu\'à 5 images');
+  const pickImages = async () => {
+    if (images.length >= 5) {
+      Alert.alert('Maximum 5 images', 'Vous ne pouvez pas ajouter plus de 5 images.');
       return;
     }
 
@@ -70,319 +54,356 @@ export default function PostScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setImageUris([...imageUris, result.assets[0].uri]);
+      setImages([...images, result.assets[0].uri]);
     }
   };
 
   const removeImage = (index: number) => {
-    setImageUris(imageUris.filter((_, i) => i !== index));
+    setImages(images.filter((_, i) => i !== index));
   };
 
-  const uploadImages = async (): Promise<string[]> => {
-    const uploadedUrls: string[] = [];
+  const handleCategorySelect = (value: string) => {
+    setCategory(value);
+    setShowCategoryModal(false);
+  };
 
-    for (const uri of imageUris) {
-      try {
+  const uploadImage = async (uri: string, index: number) => {
+    try {
+      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${user.id}/${Date.now()}-${index}.${fileExt}`;
+      
+      let fileData;
+      if (Platform.OS === 'web') {
         const response = await fetch(uri);
-        const blob = await response.blob();
-        const fileExt = uri.split('.').pop();
-        const fileName = `${user!.id}/${Date.now()}.${fileExt}`;
-
-        const { data, error } = await supabase.storage
-          .from('listings')
-          .upload(fileName, blob, {
-            contentType: `image/${fileExt}`,
-          });
-
-        if (error) throw error;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('listings')
-          .getPublicUrl(data.path);
-
-        uploadedUrls.push(publicUrlData.publicUrl);
-      } catch (error) {
-        console.error('Error uploading image:', error);
-        throw error;
+        fileData = await response.blob();
+      } else {
+        const base64 = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        fileData = new Blob([byteArray], { type: `image/${fileExt}` });
       }
-    }
 
-    return uploadedUrls;
+      const { data, error } = await supabase.storage
+        .from('listings')
+        .upload(fileName, fileData, {
+          contentType: `image/${fileExt}`,
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('listings')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
   };
 
   const handleSubmit = async () => {
-    // Vérification détaillée des champs obligatoires
-    const missingFields = [];
-    if (!title) missingFields.push('titre');
-    if (!description) missingFields.push('description');
-    if (!price) missingFields.push('prix');
-    if (!location) missingFields.push('localisation');
-    if (!categoryId) missingFields.push('catégorie');
-    
-    if (missingFields.length > 0) {
-      setError(`Veuillez remplir les champs obligatoires suivants: ${missingFields.join(', ')}`);
-      return;
-    }
-
-    if (!user) {
-      setError('Vous devez être connecté pour publier');
-      return;
-    }
-
-    if (imageUris.length === 0) {
-      setError('Veuillez ajouter au moins une image');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const uploadedImageUrls = await uploadImages();
-
-      const { error: insertError } = await supabase.from('listings').insert({
-        title,
-        description,
-        price: parseFloat(price),
-        location,
-        category_id: categoryId,
-        condition,
-        images: uploadedImageUrls,
-        seller_id: user.id,
-        status: 'active', // Auto-activate listings for better user experience
-      });
-
-      if (insertError) throw insertError;
-
+    if (!user?.phone || !user?.location) {
       Alert.alert(
-        'Succès',
-        'Votre annonce a été publiée avec succès!',
+        'Profil incomplet',
+        'Veuillez compléter votre profil avec votre numéro WhatsApp et votre ville avant de publier une annonce.',
         [
           {
-            text: 'OK',
-            onPress: () => {
-              setTitle('');
-              setDescription('');
-              setPrice('');
-              setLocation(user.location || '');
-              setCategoryId('');
-              setCondition('good');
-              setImageUris([]);
-              router.push('/(tabs)/profile');
-            },
+            text: 'Compléter le profil',
+            onPress: () => router.push('/auth/complete-profile'),
           },
+          { text: 'Annuler', style: 'cancel' },
         ]
       );
-    } catch (err: any) {
-      setError(err.message || 'Erreur lors de la publication');
+      return;
+    }
+
+    if (!title || !category || !description || !price || images.length === 0) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs et ajouter au moins une image.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Récupérer l'ID de la catégorie
+      const { data: categoryData, error: categoryError } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('slug', category)
+        .single();
+
+      if (categoryError) throw categoryError;
+      if (!categoryData) throw new Error('Catégorie non trouvée');
+
+      const imageUrls = await Promise.all(
+        images.map(async (uri, index) => {
+          try {
+            const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+            const fileName = `${user.id}/${Date.now()}-${index}.${fileExt}`;
+            
+            let fileData;
+            if (Platform.OS === 'web') {
+              const response = await fetch(uri);
+              fileData = await response.blob();
+            } else {
+              const base64 = await FileSystem.readAsStringAsync(uri, {
+                encoding: FileSystem.EncodingType.Base64,
+              });
+              const byteCharacters = atob(base64);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              fileData = new Blob([byteArray], { type: `image/${fileExt}` });
+            }
+
+            const { data, error } = await supabase.storage
+              .from('listings')
+              .upload(fileName, fileData, {
+                contentType: `image/${fileExt}`,
+                cacheControl: '3600',
+                upsert: false,
+              });
+
+            if (error) throw error;
+
+            const { data: { publicUrl } } = supabase.storage
+              .from('listings')
+              .getPublicUrl(fileName);
+
+            return publicUrl;
+          } catch (error) {
+            console.error('Error uploading image:', error);
+            throw error;
+          }
+        })
+      );
+
+      const { data, error } = await supabase
+        .from('listings')
+        .insert({
+          seller_id: user.id,
+          title,
+          category_id: categoryData.id,
+          description,
+          price: parseFloat(price),
+          images: imageUrls,
+          status: 'active',
+          location: user.location,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      Alert.alert('Succès', 'Votre annonce a été publiée avec succès !');
+      router.push('/profile');
+    } catch (error) {
+      console.error('Error submitting listing:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la publication de votre annonce. Veuillez réessayer.');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const [categories, setCategories] = useState<Category[]>([]);
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.messageCard}>
+          <Text style={styles.messageTitle}>
+            Connexion requise
+          </Text>
+          <Text style={styles.messageText}>
+            Pour publier une annonce, vous devez d'abord vous connecter.
+          </Text>
+          
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => router.push('/auth/login')}
+          >
+            <Text style={styles.buttonText}>Se connecter</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
-  const conditions: { value: ListingCondition; label: string }[] = [
-    { value: 'new', label: 'Neuf' },
-    { value: 'like_new', label: 'Comme neuf' },
-    { value: 'good', label: 'Bon état' },
-    { value: 'fair', label: 'État correct' },
-    { value: 'poor', label: 'À réparer' },
-  ];
+  if (!user.phone || !user.location) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.messageCard}>
+          <Text style={styles.messageTitle}>
+            Profil incomplet
+          </Text>
+          <Text style={styles.messageText}>
+            Pour publier une annonce, vous devez d'abord compléter votre profil
+            avec votre numéro WhatsApp et votre ville.
+          </Text>
+          
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => router.push('/auth/complete-profile')}
+          >
+            <Text style={styles.buttonText}>Compléter le profil</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container}>
+      <View style={styles.form}>
         <Text style={styles.title}>Publier une annonce</Text>
 
-        {error ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Photos</Text>
-          <View style={styles.imagesGrid}>
-            {imageUris.map((uri, index) => (
+        {/* Images First */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Images (max 5) *</Text>
+          <View style={styles.imageList}>
+            {images.map((uri, index) => (
               <View key={index} style={styles.imageContainer}>
-                <Image source={{ uri }} style={styles.image} />
+                <Image source={{ uri }} style={styles.imagePreview} />
                 <TouchableOpacity
                   style={styles.removeButton}
                   onPress={() => removeImage(index)}
                 >
-                  <X size={16} color="#fff" />
+                  <Text style={styles.removeButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
             ))}
-            {imageUris.length < 5 && (
-              <TouchableOpacity style={styles.addImageButton} onPress={pickImage}>
-                <Camera size={32} color="#94a3b8" />
-                <Text style={styles.addImageText}>Ajouter</Text>
+            {images.length < 5 && (
+              <TouchableOpacity
+                style={styles.addImageButton}
+                onPress={pickImages}
+              >
+                <Text style={styles.addImageButtonText}>+</Text>
+                <Text style={styles.addImageHintText}>Ajouter</Text>
               </TouchableOpacity>
             )}
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Détails</Text>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Titre de l'annonce *</Text>
+          <TextInput
+            style={styles.input}
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Titre ex: iPhone 11"
+            maxLength={100}
+          />
+        </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Titre *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: iPhone 13 Pro Max 256GB"
-              value={title}
-              onChangeText={setTitle}
-              returnKeyType="next"
-              autoCapitalize="sentences"
-              maxLength={100}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Description *</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Décrivez votre article en détail..."
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              maxLength={1000}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Prix (CDF) *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 500000"
-              value={price}
-              onChangeText={(text) => setPrice(text.replace(/[^0-9]/g, ''))}
-              keyboardType="numeric"
-              returnKeyType="next"
-              maxLength={10}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Localisation *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: Kinshasa, Gombe"
-              value={location}
-              onChangeText={setLocation}
-              returnKeyType="next"
-              autoCapitalize="words"
-              maxLength={50}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-  <Text style={styles.label}>Catégorie *</Text>
-  <TouchableOpacity
-    style={[styles.input, styles.selectInput]}
-    onPress={() => setCategoryPickerVisible(true)}
-  >
-    <Text style={categoryId ? styles.selectValueText : styles.selectPlaceholderText}>
-      {categoryId ? (categories.find(c => c.id.toString() === categoryId.toString())?.name || 'Sélectionnez une catégorie') : 'Sélectionnez une catégorie'}
-    </Text>
-    <ChevronDown size={18} color="#64748b" />
-  </TouchableOpacity>
-
-  <Modal
-    visible={categoryPickerVisible}
-    animationType="slide"
-    transparent
-    onRequestClose={() => setCategoryPickerVisible(false)}
-  >
-    <TouchableOpacity 
-      style={styles.modalOverlay}
-      activeOpacity={1}
-      onPress={() => setCategoryPickerVisible(false)}
-    >
-      <TouchableOpacity 
-        style={styles.modalContent}
-        activeOpacity={1}
-        onPress={(e) => e.stopPropagation()}
-      >
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Choisir une catégorie</Text>
-          <TouchableOpacity onPress={() => setCategoryPickerVisible(false)}>
-            <X size={20} color="#0f172a" />
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Catégorie *</Text>
+          <TouchableOpacity
+            style={[styles.input, styles.select]}
+            onPress={() => setShowCategoryModal(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={[
+              styles.selectText,
+              !category && styles.selectPlaceholder
+            ]}>
+              {category
+                ? categories.find(cat => cat.value === category)?.label
+                : 'Sélectionnez une catégorie'}
+            </Text>
+            <Text style={styles.selectArrow}>▼</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.modalList}>
-          {categories.map(cat => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[
-                styles.modalItem,
-                categoryId && cat.id && categoryId.toString() === cat.id.toString() && { backgroundColor: '#f0fdf4', borderColor: '#16a34a' },
-              ]}
-              onPress={() => {
-                setCategoryId(cat.id);
-                setCategoryPickerVisible(false);
-              }}
-            >
-              <Text style={styles.modalItemText}>{cat.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Description *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Décrivez votre article (état, caractéristiques, etc.)"
+            multiline
+            numberOfLines={4}
+            maxLength={1000}
+            textAlignVertical="top"
+          />
+        </View>
 
-        <TouchableOpacity
-          style={styles.modalCloseButton}
-          onPress={() => setCategoryPickerVisible(false)}
-        >
-          <Text style={{ color: '#fff', fontWeight: '600' }}>Fermer</Text>
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </TouchableOpacity>
-  </Modal>
-</View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>État *</Text>
-            <View style={styles.chipContainer}>
-              {conditions.map(cond => (
-                <TouchableOpacity
-                  key={cond.value}
-                  style={[
-                    styles.chip,
-                    condition === cond.value && styles.chipActive,
-                  ]}
-                  onPress={() => setCondition(cond.value)}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      condition === cond.value && styles.chipTextActive,
-                    ]}
-                  >
-                    {cond.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Prix (en USD) *</Text>
+          <TextInput
+            style={styles.input}
+            value={price}
+            onChangeText={setPrice}
+            placeholder="0.00"
+            keyboardType="decimal-pad"
+          />
         </View>
 
         <TouchableOpacity
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+          style={[
+            styles.button,
+            (isSubmitting || !title || !category || !description || !price || images.length === 0) && styles.buttonDisabled
+          ]}
           onPress={handleSubmit}
-          disabled={loading}
+          disabled={isSubmitting || !title || !category || !description || !price || images.length === 0}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>Publier l'annonce</Text>
-          )}
+          <Text style={styles.buttonText}>
+            {isSubmitting ? 'Publication en cours...' : 'Publier l\'annonce'}
+          </Text>
         </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+
+      {/* Category Modal */}
+      <Modal
+        visible={showCategoryModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCategoryModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Sélectionnez une catégorie</Text>
+              <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
+                <Text style={styles.modalClose}>×</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={categories}
+              keyExtractor={(item) => item.value}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.categoryItem,
+                    category === item.value && styles.categoryItemSelected
+                  ]}
+                  onPress={() => handleCategorySelect(item.value)}
+                >
+                  <Text style={[
+                    styles.categoryItemText,
+                    category === item.value && styles.categoryItemTextSelected
+                  ]}>
+                    {item.label}
+                  </Text>
+                  {category === item.value && (
+                    <Text style={styles.checkmark}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
   );
 }
 
@@ -391,71 +412,37 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  content: {
-    padding: 16,
-    paddingBottom: 40, // Ajoute plus d'espace en bas pour éviter que le contenu soit coupé
+  messageCard: {
+    margin: 24,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 12,
+    padding: 24,
+    borderLeftWidth: 4,
+    borderLeftColor: '#16a34a',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 24,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
+  messageTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 12,
-  },
-  imagesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  imageContainer: {
-    position: 'relative',
-    width: '30%',
-    aspectRatio: 1,
+    color: '#16a34a',
     marginBottom: 8,
-    marginRight: '3%',
   },
-  image: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
+  messageText: {
+    fontSize: 14,
+    color: '#334155',
+    marginBottom: 24,
+    lineHeight: 20,
   },
-  removeButton: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: '#dc2626',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+  form: {
+    padding: 24,
   },
-  addImageButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addImageText: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 4,
+  title: {
+    fontSize: 24,
+    fontWeight: '600',
+    marginBottom: 24,
+    color: '#0f172a',
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 24,
   },
   label: {
     fontSize: 14,
@@ -470,129 +457,145 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+  },
+  textArea: {
+    minHeight: 100,
+  },
+  select: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectText: {
+    fontSize: 16,
+    color: '#334155',
+    flex: 1,
+  },
+  selectPlaceholder: {
+    color: '#94a3b8',
+  },
+  selectArrow: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  imageList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  imageContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  imagePreview: {
     width: '100%',
+    height: '100%',
+  },
+  removeButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  addImageButton: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  addImageButtonText: {
+    fontSize: 32,
+    color: '#94a3b8',
+  },
+  addImageHintText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 4,
+  },
+  button: {
+    backgroundColor: '#16a34a',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    width: '90%',
     backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    paddingBottom: 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#0f172a',
   },
-  modalList: {
-    maxHeight: 300,
+  modalClose: {
+    fontSize: 32,
+    color: '#94a3b8',
+    fontWeight: '300',
   },
-  modalItem: {
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  modalItemText: {
-    fontSize: 16,
-    color: '#0f172a',
-  },
-  modalCloseButton: {
-    marginTop: 16,
-    backgroundColor: '#16a34a',
-    paddingVertical: 12,
-    borderRadius: 4,
-    alignItems: 'center',
-  },
-  selectInput: {
+  categoryItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 4,
-  },
-  selectValueText: {
-    fontSize: 16,
-    color: '#0f172a',
-  },
-  selectPlaceholderText: {
-    fontSize: 16,
-    color: '#94a3b8',
-  },
-  textArea: {
-    minHeight: 120,
-    paddingTop: 12,
-    textAlignVertical: 'top',
-  },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  chipActive: {
-    backgroundColor: '#16a34a',
-  },
-  chipText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#475569',
-  },
-  chipTextActive: {
-    color: '#fff',
-  },
-  submitButton: {
-    backgroundColor: '#16a34a',
     padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 30,
-    width: '100%',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  submitButtonDisabled: {
-    opacity: 0.6,
+  categoryItemSelected: {
+    backgroundColor: '#f0fdf4',
   },
-  submitButtonText: {
-    color: '#fff',
+  categoryItemText: {
+    fontSize: 16,
+    color: '#334155',
+  },
+  categoryItemTextSelected: {
+    color: '#16a34a',
+    fontWeight: '500',
+  },
+  checkmark: {
     fontSize: 18,
-    fontWeight: 'bold',
-  },
-  errorContainer: {
-    backgroundColor: '#fef2f2',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#dc2626',
-  },
-  errorText: {
-    color: '#dc2626',
-    fontSize: 14,
+    color: '#16a34a',
+    fontWeight: '600',
   },
 });

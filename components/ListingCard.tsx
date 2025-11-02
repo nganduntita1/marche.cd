@@ -1,50 +1,54 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { MapPin } from 'lucide-react-native';
-import { ListingWithDetails } from '@/types/database';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+} from 'react-native';
+import { useRouter } from 'expo-router';
 
-interface ListingCardProps {
-  listing: ListingWithDetails;
-  onPress: () => void;
-}
+type ListingCardProps = {
+  id: string;
+  title: string;
+  price: number;
+  image: string;
+  status: 'active' | 'sold';
+};
 
-export function ListingCard({ listing, onPress }: ListingCardProps) {
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('fr-CD', {
-      style: 'currency',
-      currency: 'CDF',
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
+const { width } = Dimensions.get('window');
+const cardWidth = (width - 64) / 2; // 2 columns with 24px padding on sides and 16px gap
 
-  const imageUrl = listing.images?.[0] || 'https://images.pexels.com/photos/4968391/pexels-photo-4968391.jpeg?auto=compress&cs=tinysrgb&w=400';
+export default function ListingCard({ id, title, price, image, status }: ListingCardProps) {
+  const router = useRouter();
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      <Image source={{ uri: imageUrl }} style={styles.image} />
-      {listing.is_featured && (
-        <View style={styles.featuredBadge}>
-          <Text style={styles.featuredText}>En vedette</Text>
-        </View>
-      )}
+    <TouchableOpacity
+      style={[styles.card, status === 'sold' && styles.cardSold]}
+      onPress={() => router.push(`/listing/${id}`)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.imageContainer}>
+        <Image
+          source={{ uri: image }}
+          style={styles.image}
+          resizeMode="cover"
+        />
+        {status === 'sold' && (
+          <View style={styles.soldBadge}>
+            <Text style={styles.soldText}>VENDU</Text>
+          </View>
+        )}
+      </View>
+
       <View style={styles.content}>
         <Text style={styles.title} numberOfLines={2}>
-          {listing.title}
+          {title}
         </Text>
-        <Text style={styles.price}>{formatPrice(listing.price)}</Text>
-        <View style={styles.footer}>
-          <View style={styles.locationContainer}>
-            <MapPin size={14} color="#64748b" />
-            <Text style={styles.location} numberOfLines={1}>
-              {listing.location}
-            </Text>
-          </View>
-          {listing.category && (
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryText}>{listing.category.name}</Text>
-            </View>
-          )}
-        </View>
+        <Text style={styles.price}>
+          {price.toLocaleString('fr-FR')} $
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -52,31 +56,36 @@ export function ListingCard({ listing, onPress }: ListingCardProps) {
 
 const styles = StyleSheet.create({
   card: {
+    width: cardWidth,
     backgroundColor: '#fff',
     borderRadius: 12,
-    marginBottom: 16,
     overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  cardSold: {
+    opacity: 0.8,
+  },
+  imageContainer: {
+    width: '100%',
+    height: cardWidth,
+    backgroundColor: '#f1f5f9',
+    position: 'relative',
   },
   image: {
     width: '100%',
-    height: 200,
-    backgroundColor: '#f1f5f9',
+    height: '100%',
   },
-  featuredBadge: {
+  soldBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: '#16a34a',
-    paddingHorizontal: 8,
+    top: 8,
+    right: 8,
+    backgroundColor: '#ef4444',
     paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    borderRadius: 4,
   },
-  featuredText: {
+  soldText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
@@ -85,42 +94,15 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#334155',
     marginBottom: 4,
+    height: 40,
   },
   price: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#16a34a',
-    marginBottom: 8,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
-  },
-  location: {
-    fontSize: 12,
-    color: '#64748b',
-    marginLeft: 4,
-  },
-  categoryBadge: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  categoryText: {
-    fontSize: 11,
-    color: '#475569',
-    fontWeight: '500',
   },
 });

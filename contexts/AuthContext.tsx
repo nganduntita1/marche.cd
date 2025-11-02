@@ -8,8 +8,9 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, location: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
+  loadUserProfile: (userId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -61,24 +62,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, name: string, location: string) => {
+  const signUp = async (email: string, password: string, name: string) => {
     try {
-      // First, sign up the user with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             name,
-            location,
           },
         },
       });
 
       if (error) throw error;
 
-      // The user profile will be created automatically via a trigger
-      // But we'll also try to create it manually as a fallback
+      // Create initial user profile
       if (data.user) {
         try {
           const { error: profileError } = await supabase
@@ -86,18 +84,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .insert({
               id: data.user.id,
               name,
-              phone: email,
               email,
-              location,
+              phone: '',
+              location: '',
+              is_verified: false,
             });
-            
-          if (profileError) {
-            console.log('Note: Profile creation via insert failed, but this is expected if the trigger created it:', profileError.message);
-          }
+
+          if (profileError) throw profileError;
         } catch (profileErr) {
-          console.log('Profile creation fallback failed, but auth succeeded:', profileErr);
+          console.error('Error creating initial profile:', profileErr);
+          // Continue since the trigger should handle this
         }
       }
+
+      return;
     } catch (error: any) {
       throw new Error(error.message || 'Error creating account');
     }
@@ -111,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) throw error;
+      
       if (data.session?.user) {
         await loadUserProfile(data.session.user.id);
       }
@@ -123,6 +124,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      setUser(null);
+      setSession(null);
     } catch (error: any) {
       throw new Error(error.message || 'Error signing out');
     }
@@ -137,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signOut,
+        loadUserProfile,
       }}
     >
       {children}

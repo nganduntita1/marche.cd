@@ -15,7 +15,6 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [location, setLocation] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,7 +23,7 @@ export default function RegisterScreen() {
   const router = useRouter();
 
   const handleRegister = async () => {
-    if (!name || !email || !location || !password || !confirmPassword) {
+    if (!name || !email || !password || !confirmPassword) {
       setError('Veuillez remplir tous les champs');
       return;
     }
@@ -43,8 +42,8 @@ export default function RegisterScreen() {
     setError('');
 
     try {
-      await signUp(email, password, name, location);
-      router.replace('/(tabs)');
+      await signUp(email, password, name);
+      router.replace('/auth/complete-profile');
     } catch (err: any) {
       setError(err.message || 'Erreur lors de la création du compte');
     } finally {
@@ -91,16 +90,6 @@ export default function RegisterScreen() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Ville</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Kinshasa, Lubumbashi, etc."
-              value={location}
-              onChangeText={setLocation}
             />
           </View>
 

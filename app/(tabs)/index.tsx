@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { Search, Filter } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ListingWithDetails, Category } from '@/types/database';
-import { ListingCard } from '@/components/ListingCard';
+import ListingCard from '@/components/ListingCard';
 
 export default function HomeScreen() {
   const [listings, setListings] = useState<ListingWithDetails[]>([]);
@@ -154,7 +154,11 @@ export default function HomeScreen() {
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
           <ListingCard
-            listing={item}
+            id={item.id}
+            title={item.title}
+            price={item.price}
+            image={item.images[0]}
+            status={item.status}
             onPress={() => router.push(`/listing/${item.id}`)}
           />
         )}

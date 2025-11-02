@@ -1,111 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
-  TouchableOpacity,
   StyleSheet,
-  Alert,
-  ActivityIndicator,
+  TouchableOpacity,
+  ScrollView,
+  Image,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { LogOut, Package, MapPin, Phone } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { ListingWithDetails } from '@/types/database';
-import { ListingCard } from '@/components/ListingCard';
+import ListingCard from '@/components/ListingCard';
+
+type Listing = {
+  id: string;
+  title: string;
+  price: number;
+  images: string[];
+  created_at: string;
+  status: 'active' | 'sold';
+};
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
-  const [listings, setListings] = useState<ListingWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<'active' | 'pending' | 'sold'>('active');
   const router = useRouter();
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      loadListings();
-    }
-  }, [user, selectedTab]);
-
-  const loadListings = async () => {
-    if (!user) return;
-
+  const fetchUserListings = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('listings')
-        .select(`
-          *,
-          seller:users(*),
-          category:categories(*)
-        `)
-        .eq('seller_id', user.id)
-        .eq('status', selectedTab)
+        .select('*')
+        .eq('seller_id', user?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setListings(data || []);
     } catch (error) {
-      console.error('Error loading listings:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      console.error('Error fetching listings:', error);
     }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadListings();
-  };
-
-  const handleSignOut = async () => {
-    Alert.alert('Déconnexion', 'Êtes-vous sûr de vouloir vous déconnecter?', [
-      { text: 'Annuler', style: 'cancel' },
-      {
-        text: 'Déconnexion',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await signOut();
-            router.replace('/auth/login');
-          } catch (error: any) {
-            Alert.alert('Erreur', error.message);
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleDeleteListing = (listingId: string) => {
-    Alert.alert(
-      'Supprimer l\'annonce',
-      'Êtes-vous sûr de vouloir supprimer cette annonce?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('listings')
-                .delete()
-                .eq('id', listingId);
-
-              if (error) throw error;
-              loadListings();
-              Alert.alert('Succès', 'Annonce supprimée');
-            } catch (error: any) {
-              Alert.alert('Erreur', error.message);
-            }
-          },
-        },
-      ]
-    );
   };
 
   const handleMarkAsSold = async (listingId: string) => {
@@ -116,320 +51,349 @@ export default function ProfileScreen() {
         .eq('id', listingId);
 
       if (error) throw error;
-      loadListings();
-      Alert.alert('Succès', 'Annonce marquée comme vendue');
-    } catch (error: any) {
-      Alert.alert('Erreur', error.message);
+      await fetchUserListings();
+    } catch (error) {
+      console.error('Error marking listing as sold:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la mise à jour du statut de l\'annonce.');
     }
   };
 
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <View style={styles.profileCard}>
-        <View style={styles.avatarContainer}>
-          <Text style={styles.avatarText}>
-            {user?.name[0].toUpperCase()}
-          </Text>
-        </View>
-        <View style={styles.profileInfo}>
-          <Text style={styles.userName}>{user?.name}</Text>
-          <View style={styles.infoRow}>
-            <Phone size={14} color="#64748b" />
-            <Text style={styles.infoText}>{user?.phone}</Text>
-          </View>
-          {user?.location && (
-            <View style={styles.infoRow}>
-              <MapPin size={14} color="#64748b" />
-              <Text style={styles.infoText}>{user.location}</Text>
-            </View>
-          )}
-        </View>
-      </View>
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchUserListings();
+    setRefreshing(false);
+  };
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-        <LogOut size={20} color="#dc2626" />
-        <Text style={styles.logoutText}>Déconnexion</Text>
-      </TouchableOpacity>
+  useEffect(() => {
+    if (user?.id) {
+      fetchUserListings();
+    }
+  }, [user?.id]);
 
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'active' && styles.tabActive]}
-          onPress={() => setSelectedTab('active')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              selectedTab === 'active' && styles.tabTextActive,
-            ]}
-          >
-            Active
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'pending' && styles.tabActive]}
-          onPress={() => setSelectedTab('pending')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              selectedTab === 'pending' && styles.tabTextActive,
-            ]}
-          >
-            En attente
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'sold' && styles.tabActive]}
-          onPress={() => setSelectedTab('sold')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              selectedTab === 'sold' && styles.tabTextActive,
-            ]}
-          >
-            Vendues
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  if (loading && !refreshing) {
+  if (!user) {
     return (
-      <SafeAreaView style={styles.container}>
-        {renderHeader()}
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#16a34a" />
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.logo}>Marché.cd</Text>
+          <Text style={styles.tagline}>Connectez-vous pour continuer</Text>
         </View>
-      </SafeAreaView>
+
+        <View style={styles.messageCard}>
+          <Text style={styles.messageTitle}>
+            Connexion requise
+          </Text>
+          <Text style={styles.messageText}>
+            Pour accéder à votre profil et gérer vos annonces, vous devez d'abord vous connecter.
+          </Text>
+          
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => router.push('/auth/login')}
+          >
+            <Text style={styles.buttonText}>Se connecter</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <FlatList
-        ListHeaderComponent={renderHeader}
-        data={listings}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <View>
-            <ListingCard
-              listing={item}
-              onPress={() => router.push(`/listing/${item.id}`)}
-            />
-            {selectedTab === 'active' && (
-              <View style={styles.listingActions}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => handleMarkAsSold(item.id)}
-                >
-                  <Text style={styles.actionButtonText}>Marquer vendu</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.deleteButton]}
-                  onPress={() => handleDeleteListing(item.id)}
-                >
-                  <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                    Supprimer
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            {selectedTab === 'pending' && (
-              <View style={styles.listingActions}>
-                <View style={styles.pendingNotice}>
-                  <Text style={styles.pendingText}>
-                    En attente de modération
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.deleteButton]}
-                  onPress={() => handleDeleteListing(item.id)}
-                >
-                  <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                    Supprimer
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#16a34a']}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Package size={48} color="#cbd5e1" />
-            <Text style={styles.emptyText}>Aucune annonce</Text>
-            <Text style={styles.emptySubtext}>
-              {selectedTab === 'active' && "Vous n'avez pas encore d'annonces actives"}
-              {selectedTab === 'pending' && "Vous n'avez pas d'annonces en attente"}
-              {selectedTab === 'sold' && "Vous n'avez pas encore vendu d'articles"}
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={['#16a34a']}
+          tintColor="#16a34a"
+        />
+      }
+    >
+      <View style={styles.header}>
+        <Text style={styles.logo}>Marché.cd</Text>
+        <Text style={styles.tagline}>Mon profil</Text>
+      </View>
+
+      <View style={styles.profileSection}>
+        <View style={styles.profileHeader}>
+          <View style={styles.avatarContainer}>
+            <Text style={styles.avatarText}>
+              {user.email?.[0].toUpperCase() || '?'}
             </Text>
           </View>
-        }
-      />
-    </SafeAreaView>
+          <View style={styles.profileInfo}>
+            <Text style={styles.emailText}>{user.email}</Text>
+            <Text style={styles.phoneText}>{user.phone || 'Aucun numéro'}</Text>
+            <Text style={styles.locationText}>{user.location || 'Aucune ville'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.actionButtons}>
+          {(!user.phone || !user.location) && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.actionButtonHighlight]}
+              onPress={() => router.push('/auth/complete-profile')}
+            >
+              <Text style={[styles.actionButtonText, { color: '#fff' }]}>
+                Compléter le profil
+              </Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={signOut}
+          >
+            <Text style={styles.actionButtonText}>Se déconnecter</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.listingsSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Mes annonces</Text>
+          <TouchableOpacity
+            style={styles.newListingButton}
+            onPress={() => router.push('/post')}
+          >
+            <Text style={styles.newListingButtonText}>Nouvelle annonce</Text>
+          </TouchableOpacity>
+        </View>
+
+        {listings.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateTitle}>Aucune annonce</Text>
+            <Text style={styles.emptyStateText}>
+              Vous n'avez pas encore publié d'annonces.
+              Commencez à vendre en publiant votre première annonce !
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyStateButton}
+              onPress={() => router.push('/post')}
+            >
+              <Text style={styles.emptyStateButtonText}>
+                Publier une annonce
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.listingsGrid}>
+            {listings.map((listing) => (
+              <View key={listing.id} style={styles.listingContainer}>
+                <ListingCard
+                  id={listing.id}
+                  title={listing.title}
+                  price={listing.price}
+                  image={listing.images[0]}
+                  status={listing.status}
+                />
+                {listing.status === 'active' && (
+                  <TouchableOpacity
+                    style={styles.markAsSoldButton}
+                    onPress={() => handleMarkAsSold(listing.id)}
+                  >
+                    <Text style={styles.markAsSoldButtonText}>
+                      Marquer comme vendu
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fff',
   },
   header: {
-    backgroundColor: '#fff',
-    padding: 16,
+    alignItems: 'center',
+    paddingVertical: 24,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
-  profileCard: {
+  logo: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#16a34a',
+    marginBottom: 8,
+  },
+  tagline: {
+    fontSize: 16,
+    color: '#64748b',
+  },
+  messageCard: {
+    margin: 24,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 12,
+    padding: 24,
+    borderLeftWidth: 4,
+    borderLeftColor: '#16a34a',
+  },
+  messageTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#16a34a',
+    marginBottom: 8,
+  },
+  messageText: {
+    fontSize: 14,
+    color: '#334155',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  profileSection: {
+    padding: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
   avatarContainer: {
     width: 64,
     height: 64,
     borderRadius: 32,
     backgroundColor: '#16a34a',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 16,
   },
   avatarText: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '600',
     color: '#fff',
   },
   profileInfo: {
     flex: 1,
   },
-  userName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 4,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    backgroundColor: '#fef2f2',
-    marginBottom: 16,
-  },
-  logoutText: {
+  emailText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#dc2626',
+    color: '#334155',
+    marginBottom: 4,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
-  },
-  tabActive: {
-    backgroundColor: '#16a34a',
-  },
-  tabText: {
+  phoneText: {
     fontSize: 14,
-    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 2,
+  },
+  locationText: {
+    fontSize: 14,
     color: '#64748b',
   },
-  tabTextActive: {
-    color: '#fff',
-  },
-  listContent: {
-    padding: 16,
-  },
-  listingActions: {
+  actionButtons: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: -8,
-    marginBottom: 16,
+    gap: 12,
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    backgroundColor: '#f1f5f9',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: '#16a34a',
     alignItems: 'center',
+  },
+  actionButtonHighlight: {
+    backgroundColor: '#16a34a',
   },
   actionButtonText: {
     fontSize: 14,
+    fontWeight: '500',
+    color: '#334155',
+  },
+  listingsSection: {
+    padding: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
     fontWeight: '600',
+    color: '#334155',
+  },
+  newListingButton: {
+    backgroundColor: '#16a34a',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  newListingButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
     color: '#fff',
   },
-  deleteButton: {
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fecaca',
-  },
-  deleteButtonText: {
-    color: '#dc2626',
-  },
-  pendingNotice: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#fef3c7',
+  emptyState: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 24,
     alignItems: 'center',
   },
-  pendingText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#92400e',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 48,
-  },
-  emptyText: {
+  emptyStateTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#0f172a',
-    marginTop: 16,
+    color: '#334155',
     marginBottom: 8,
   },
-  emptySubtext: {
+  emptyStateText: {
     fontSize: 14,
     color: '#64748b',
     textAlign: 'center',
-    paddingHorizontal: 32,
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  emptyStateButton: {
+    backgroundColor: '#16a34a',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  emptyStateButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#fff',
+  },
+  listingsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  button: {
+    backgroundColor: '#16a34a',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  listingContainer: {
+    width: '48%',
+    marginBottom: 16,
+  },
+  markAsSoldButton: {
+    backgroundColor: '#f1f5f9',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  markAsSoldButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#334155',
   },
 });
