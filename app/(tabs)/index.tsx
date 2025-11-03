@@ -8,13 +8,23 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Search, Filter } from 'lucide-react-native';
+import { Search, MapPin, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ListingWithDetails, Category } from '@/types/database';
 import ListingCard from '@/components/ListingCard';
+
+const PREDEFINED_LOCATIONS = [
+  'Kinshasa, Gombe',
+  'Kinshasa, Bandalungwa',
+  'Kinshasa, Lingwala',
+  'Kinshasa, Barumbu',
+  'Kinshasa, Lemba',
+  'Kinshasa, Limete',
+];
 
 export default function HomeScreen() {
   const [listings, setListings] = useState<ListingWithDetails[]>([]);
@@ -23,6 +33,8 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -61,6 +73,10 @@ export default function HomeScreen() {
         query = query.eq('category_id', selectedCategory);
       }
 
+      if (selectedLocation) {
+        query = query.eq('location', selectedLocation);
+      }
+
       const { data, error } = await query;
 
       if (error) throw error;
@@ -71,6 +87,11 @@ export default function HomeScreen() {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const handleLocationSelect = (location: string) => {
+    setSelectedLocation(location === selectedLocation ? null : location);
+    setShowLocationModal(false);
   };
 
   const onRefresh = () => {
@@ -96,8 +117,23 @@ export default function HomeScreen() {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setShowLocationModal(true)}
+        >
+          <MapPin size={20} color={selectedLocation ? '#16a34a' : '#94a3b8'} />
+        </TouchableOpacity>
       </View>
 
+      {selectedLocation && (
+        <View style={styles.locationChip}>
+          <MapPin size={16} color="#16a34a" />
+          <Text style={styles.locationChipText}>{selectedLocation}</Text>
+          <TouchableOpacity onPress={() => setSelectedLocation(null)}>
+            <X size={16} color="#64748b" />
+          </TouchableOpacity>
+        </View>
+      )}
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -146,39 +182,94 @@ export default function HomeScreen() {
     );
   }
 
+  const renderItem = ({ item }: { item: ListingWithDetails }) => (
+    <View style={styles.listingCardContainer}>
+      <ListingCard
+        id={item.id}
+        title={item.title}
+        price={item.price}
+        image={item.images[0]}
+        status={item.status}
+      />
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
-      <FlatList
-        ListHeaderComponent={renderHeader}
-        data={filteredListings}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <ListingCard
-            id={item.id}
-            title={item.title}
-            price={item.price}
-            image={item.images[0]}
-            status={item.status}
-            onPress={() => router.push(`/listing/${item.id}`)}
-          />
-        )}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#16a34a']}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Aucune annonce trouvée</Text>
-            <Text style={styles.emptySubtext}>
-              Essayez de rechercher autre chose ou de modifier vos filtres
-            </Text>
+      {renderHeader()}
+      
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#16a34a" />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredListings}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listingsContainer}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                Aucune annonce trouvée
+              </Text>
+            </View>
+          }
+        />
+      )}
+      <Modal
+        visible={showLocationModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLocationModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowLocationModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Choisir une localisation</Text>
+              <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+                <X size={24} color="#334155" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.locationList}>
+              {PREDEFINED_LOCATIONS.map((location) => (
+                <TouchableOpacity
+                  key={location}
+                  style={[
+                    styles.locationOption,
+                    location === selectedLocation && styles.locationOptionActive,
+                  ]}
+                  onPress={() => handleLocationSelect(location)}
+                >
+                  <MapPin
+                    size={20}
+                    color={location === selectedLocation ? '#16a34a' : '#64748b'}
+                  />
+                  <Text
+                    style={[
+                      styles.locationOptionText,
+                      location === selectedLocation && styles.locationOptionTextActive,
+                    ]}
+                  >
+                    {location}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        }
-      />
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -186,53 +277,72 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fff',
   },
   header: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+    padding: 24,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
+    backgroundColor: '#fff',
   },
   logo: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: '#16a34a',
   },
   subtitle: {
     fontSize: 14,
     color: '#64748b',
-    marginBottom: 16,
+    marginTop: 4,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f8fafc',
     borderRadius: 12,
-    paddingHorizontal: 12,
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 24,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
-    height: 48,
+    paddingVertical: 12,
     fontSize: 16,
+    color: '#0f172a',
   },
-  categoriesList: {
-    marginHorizontal: -16,
+  listingsContainer: {
+    padding: 12,
   },
-  categoriesContainer: {
-    paddingHorizontal: 16,
+  row: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+  },
+  listingCardContainer: {
+    width: '48%',
+    marginBottom: 24,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyState: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
   },
   categoryChip: {
-    backgroundColor: '#f1f5f9',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    backgroundColor: '#f1f5f9',
     marginRight: 8,
   },
   categoryChipActive: {
@@ -241,33 +351,72 @@ const styles = StyleSheet.create({
   categoryChipText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#475569',
+    color: '#64748b',
   },
   categoryChipTextActive: {
     color: '#fff',
   },
-  listContent: {
-    padding: 16,
+  locationChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    alignSelf: 'flex-start',
+    gap: 6,
   },
-  loadingContainer: {
+  locationChipText: {
+    fontSize: 14,
+    color: '#16a34a',
+    fontWeight: '500',
+  },
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 48,
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    width: '90%',
+    maxWidth: 400,
+    padding: 24,
   },
-  emptyText: {
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 8,
+    color: '#334155',
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-    paddingHorizontal: 32,
+  locationList: {
+    gap: 12,
+  },
+  locationOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+  },
+  locationOptionActive: {
+    backgroundColor: '#f0fdf4',
+  },
+  locationOptionText: {
+    fontSize: 16,
+    color: '#334155',
+  },
+  locationOptionTextActive: {
+    color: '#16a34a',
+    fontWeight: '500',
   },
 });

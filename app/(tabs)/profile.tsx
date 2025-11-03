@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import ListingCard from '@/components/ListingCard';
+import CreditCard from '@/components/CreditCard';
 
 type Listing = {
   id: string;
@@ -27,6 +28,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [listings, setListings] = useState<Listing[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
 
   const fetchUserListings = async () => {
     try {
@@ -67,8 +69,24 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (user?.id) {
       fetchUserListings();
+      fetchUserCredits();
     }
   }, [user?.id]);
+
+  const fetchUserCredits = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('credits')
+        .eq('id', user?.id)
+        .single();
+
+      if (error) throw error;
+      setCredits(data.credits);
+    } catch (error) {
+      console.error('Error fetching credits:', error);
+    }
+  };
 
   if (!user) {
     return (
@@ -128,6 +146,13 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        <View style={styles.creditInfo}>
+          <Text style={styles.creditLabel}>Crédits disponibles</Text>
+          <View style={styles.creditBadge}>
+            <Text style={styles.creditValue}>{credits || 0}</Text>
+          </View>
+        </View>
+
         <View style={styles.actionButtons}>
           {(!user.phone || !user.location) && (
             <TouchableOpacity
@@ -135,16 +160,25 @@ export default function ProfileScreen() {
               onPress={() => router.push('/auth/complete-profile')}
             >
               <Text style={[styles.actionButtonText, { color: '#fff' }]}>
-                Compléter le profil
+                Compléter mon profil
               </Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={signOut}
-          >
+          <TouchableOpacity style={styles.actionButton} onPress={signOut}>
             <Text style={styles.actionButtonText}>Se déconnecter</Text>
           </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.creditsSection}>
+        <Text style={styles.sectionTitle}>Acheter des crédits</Text>
+        <Text style={[styles.messageText, { marginTop: 8, marginBottom: 16 }]}>
+          Achetez des crédits pour publier vos annonces. Chaque annonce coûte 1 crédit.
+        </Text>
+        <View style={styles.listingsGrid}>
+          <CreditCard amount={10} credits={10} />
+          <CreditCard amount={25} credits={30} />
+          <CreditCard amount={75} credits={100} />
         </View>
       </View>
 
@@ -395,5 +429,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: '#334155',
+  },
+  creditInfo: {
+    marginVertical: 16,
+    alignItems: 'center',
+  },
+  creditLabel: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 8,
+  },
+  creditBadge: {
+    backgroundColor: '#16a34a',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+  },
+  creditValue: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  creditsSection: {
+    padding: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
 });

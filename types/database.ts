@@ -5,6 +5,8 @@ export interface User {
   email?: string;
   location?: string;
   is_verified: boolean;
+  credits: number;
+  total_spent: number;
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +21,17 @@ export interface Category {
 
 export type ListingCondition = 'new' | 'like_new' | 'good' | 'fair' | 'poor';
 export type ListingStatus = 'pending' | 'active' | 'sold' | 'removed';
+export type PurchaseStatus = 'pending' | 'completed' | 'cancelled';
+
+export interface CreditPurchase {
+  id: string;
+  user_id: string;
+  amount: number;
+  credits: number;
+  status: PurchaseStatus;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Listing {
   id: string;

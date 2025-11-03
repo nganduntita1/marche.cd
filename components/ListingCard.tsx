@@ -56,19 +56,22 @@ export default function ListingCard({ id, title, price, image, status }: Listing
 
 const styles = StyleSheet.create({
   card: {
-    width: cardWidth,
     backgroundColor: '#fff',
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   cardSold: {
-    opacity: 0.8,
+    opacity: 0.7,
   },
   imageContainer: {
-    width: '100%',
-    height: cardWidth,
+    aspectRatio: 1,
     backgroundColor: '#f1f5f9',
     position: 'relative',
   },

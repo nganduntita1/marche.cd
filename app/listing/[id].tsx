@@ -17,13 +17,18 @@ import { supabase } from '@/lib/supabase';
 import { ListingWithDetails } from '@/types/database';
 
 const { width } = Dimensions.get('window');
+import { useAuth } from '@/contexts/AuthContext';
+import { AlertDialog, Button } from '@/components/ui';
+import { Pencil, Trash2 } from 'lucide-react-native';
 
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [listing, setListing] = useState<ListingWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -37,11 +42,11 @@ export default function ListingDetailScreen() {
         .from('listings')
         .select(`
           *,
-          seller:users(*),
-          category:categories(*)
+          seller:seller_id(*),
+          category:category_id(*)
         `)
         .eq('id', id)
-        .maybeSingle();
+        .single();
 
       if (error) throw error;
       setListing(data);
@@ -49,6 +54,20 @@ export default function ListingDetailScreen() {
       console.error('Error loading listing:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      const { error } = await supabase
+        .from('listings')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      router.back();
+    } catch (error) {
+      console.error('Error deleting listing:', error);
     }
   };
 

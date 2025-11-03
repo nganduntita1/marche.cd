@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { User } from '@/types/database';
+import { User, CreditPurchase } from '@/types/database';
+import { Alert, Linking } from 'react-native';
 
 interface AuthContextType {
   session: Session | null;
@@ -11,6 +12,9 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
   loadUserProfile: (userId: string) => Promise<void>;
+  checkCredits: () => Promise<boolean>;
+  deductCredit: () => Promise<boolean>;
+  requestCreditPurchase: (amount: number, credits: number) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -88,6 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               phone: '',
               location: '',
               is_verified: false,
+              credits: 1, // Start with 1 free credit
+              total_spent: 0,
             });
 
           if (profileError) throw profileError;
@@ -131,6 +137,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const checkCredits = async (): Promise<boolean> => {
+    if (!user) return false;
+    
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('credits')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      return data.credits > 0;
+    } catch (error) {
+      console.error('Error checking credits:', error);
+      return false;
+    }
+  };
+
+  const deductCredit = async (): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ credits: user.credits - 1 })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      
+      // Update local user state
+      setUser(prev => prev ? { ...prev, credits: prev.credits - 1 } : null);
+      return true;
+    } catch (error) {
+      console.error('Error deducting credit:', error);
+      return false;
+    }
+  };
+
+  const requestCreditPurchase = async (amount: number, credits: number) => {
+    if (!user) return;
+
+    try {
+      // Log the purchase request
+      const { error: purchaseError } = await supabase
+        .from('credit_purchases')
+        .insert({
+          user_id: user.id,
+          amount,
+          credits,
+          status: 'pending'
+        });
+
+      if (purchaseError) throw purchaseError;
+
+      // Open WhatsApp with prefilled message
+      const message = `Hello! I would like to buy ${credits} credits for $${amount}. My user ID is: ${user.id}`;
+      const whatsappUrl = `https://wa.me/27672727343?text=${encodeURIComponent(message)}`;
+      
+      const supported = await Linking.canOpenURL(whatsappUrl);
+      if (supported) {
+        await Linking.openURL(whatsappUrl);
+      } else {
+        Alert.alert('Error', "Couldn't open WhatsApp. Please make sure it's installed on your device.");
+      }
+    } catch (error) {
+      console.error('Error requesting credit purchase:', error);
+      Alert.alert('Error', 'Failed to process your purchase request. Please try again.');
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -141,6 +217,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUp,
         signOut,
         loadUserProfile,
+        checkCredits,
+        deductCredit,
+        requestCreditPurchase,
       }}
     >
       {children}

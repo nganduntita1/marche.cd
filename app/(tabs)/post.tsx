@@ -134,6 +134,34 @@ export default function PostScreen() {
     setIsSubmitting(true);
 
     try {
+      // Check if user has enough credits
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('credits')
+        .eq('id', user.id)
+        .single();
+
+      if (userError) throw userError;
+
+      if (!userData || userData.credits <= 0) {
+        Alert.alert(
+          'Crédits insuffisants',
+          'Vous avez utilisé votre crédit gratuit. Veuillez acheter plus de crédits pour continuer.',
+          [
+            {
+              text: 'Acheter des crédits',
+              onPress: () => router.push('/profile'),
+            },
+            {
+              text: 'Annuler',
+              style: 'cancel',
+            },
+          ]
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       // Récupérer l'ID de la catégorie
       const { data: categoryData, error: categoryError } = await supabase
         .from('categories')
@@ -205,6 +233,14 @@ export default function PostScreen() {
         .single();
 
       if (error) throw error;
+
+      // Deduct one credit from the user
+      const { error: creditError } = await supabase
+        .from('users')
+        .update({ credits: userData.credits - 1 })
+        .eq('id', user.id);
+
+      if (creditError) throw creditError;
 
       Alert.alert('Succès', 'Votre annonce a été publiée avec succès !');
       router.push('/profile');
