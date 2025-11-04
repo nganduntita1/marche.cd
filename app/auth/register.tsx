@@ -8,7 +8,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -52,13 +54,14 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.logo}>Marché.cd</Text>
+          <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
           <Text style={styles.tagline}>Achetez et vendez localement</Text>
         </View>
 
@@ -136,6 +139,7 @@ export default function RegisterScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+  </SafeAreaView>
   );
 }
 
@@ -153,10 +157,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
-  logo: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#16a34a',
+  logoImage: {
+    width: '100%',
+    height: 64,
+    borderRadius: 12,
     marginBottom: 8,
   },
   tagline: {
@@ -190,7 +194,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   button: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -213,7 +217,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   linkBold: {
-    color: '#16a34a',
+    color: '#9bbd1f',
     fontWeight: '600',
   },
   errorContainer: {

@@ -117,7 +117,7 @@ export default function ListingDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#16a34a" />
+          <ActivityIndicator size="large" color="#9bbd1f" />
         </View>
       </SafeAreaView>
     );
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   backButton: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   featuredText: {
-    color: '#16a34a',
+    color: '#9bbd1f',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#16a34a',
+    color: '#9bbd1f',
   },
   metaContainer: {
     flexDirection: 'row',

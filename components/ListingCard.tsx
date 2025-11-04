@@ -106,6 +106,6 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#16a34a',
+    color: '#9bbd1f',
   },
 });

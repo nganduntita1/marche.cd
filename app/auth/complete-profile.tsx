@@ -9,7 +9,9 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -59,13 +61,14 @@ export default function CompleteProfileScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.logo}>Marché.cd</Text>
+          <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
           <Text style={styles.tagline}>Complétez votre profil</Text>
         </View>
 
@@ -115,6 +118,7 @@ export default function CompleteProfileScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+  </SafeAreaView>
   );
 }
 
@@ -126,16 +130,16 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    padding: 16,
   },
   header: {
     alignItems: 'center',
     marginBottom: 32,
   },
-  logo: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#16a34a',
+  logoImage: {
+    width: '100%',
+    height: 64,
+    borderRadius: 12,
     marginBottom: 8,
   },
   tagline: {
@@ -154,7 +158,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#64748b',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   inputGroup: {
     marginBottom: 16,
@@ -169,12 +173,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 8,
-    padding: 12,
+    padding: 8,
     fontSize: 16,
     backgroundColor: '#fff',
   },
   button: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',

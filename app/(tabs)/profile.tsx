@@ -7,7 +7,9 @@ import {
   ScrollView,
   Image,
   RefreshControl,
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -92,7 +94,7 @@ export default function ProfileScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.logo}>Marché.cd</Text>
+          <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
           <Text style={styles.tagline}>Connectez-vous pour continuer</Text>
         </View>
 
@@ -116,19 +118,20 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
+    <SafeAreaView style={styles.container}>
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          colors={['#16a34a']}
-          tintColor="#16a34a"
+          colors={['#9bbd1f']}
+          tintColor="#9bbd1f"
         />
       }
     >
       <View style={styles.header}>
-        <Text style={styles.logo}>Marché.cd</Text>
+        <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
         <Text style={styles.tagline}>Mon profil</Text>
       </View>
 
@@ -236,6 +239,7 @@ export default function ProfileScreen() {
         )}
       </View>
     </ScrollView>
+  </SafeAreaView>
   );
 }
 
@@ -246,14 +250,14 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
-  logo: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#16a34a',
+  logoImage: {
+    width: '100%',
+    height: 64,
+    borderRadius: 12,
     marginBottom: 8,
   },
   tagline: {
@@ -261,40 +265,40 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   messageCard: {
-    margin: 24,
+    margin: 16,
     backgroundColor: '#f0fdf4',
     borderRadius: 12,
-    padding: 24,
+    padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#16a34a',
+    borderLeftColor: '#9bbd1f',
   },
   messageTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#16a34a',
+    color: '#9bbd1f',
     marginBottom: 8,
   },
   messageText: {
     fontSize: 14,
     color: '#334155',
-    marginBottom: 24,
+    marginBottom: 16,
     lineHeight: 20,
   },
   profileSection: {
-    padding: 24,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   avatarContainer: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -324,18 +328,18 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
   actionButton: {
     flex: 1,
     backgroundColor: '#f1f5f9',
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
   },
   actionButtonHighlight: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
   },
   actionButtonText: {
     fontSize: 14,
@@ -343,13 +347,13 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   listingsSection: {
-    padding: 24,
+    padding: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 20,
@@ -357,7 +361,7 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   newListingButton: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -370,7 +374,7 @@ const styles = StyleSheet.create({
   emptyState: {
     backgroundColor: '#f8fafc',
     borderRadius: 12,
-    padding: 24,
+    padding: 16,
     alignItems: 'center',
   },
   emptyStateTitle: {
@@ -383,13 +387,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
     lineHeight: 20,
   },
   emptyStateButton: {
-    backgroundColor: '#16a34a',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    backgroundColor: '#9bbd1f',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 8,
   },
   emptyStateButtonText: {
@@ -403,7 +407,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   button: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -440,7 +444,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   creditBadge: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 16,
@@ -451,7 +455,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   creditsSection: {
-    padding: 24,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },

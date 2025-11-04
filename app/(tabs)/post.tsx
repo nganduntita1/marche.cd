@@ -12,11 +12,13 @@ import {
   FlatList,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
 import * as FileSystem from 'expo-file-system';
+import Popup from '@/components/Popup';
 
 export default function PostScreen() {
   const { user } = useAuth();
@@ -28,6 +30,18 @@ export default function PostScreen() {
   const [images, setImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [showNoCreditsPopup, setShowNoCreditsPopup] = useState(false);
+  const [newListingId, setNewListingId] = useState<string | null>(null);
+
+  const resetForm = () => {
+    setTitle('');
+    setCategory('');
+    setDescription('');
+    setPrice('');
+    setImages([]);
+    setNewListingId(null);
+  };
 
   const categories = [
     { label: 'Téléphones', value: 'telephones' },
@@ -67,49 +81,6 @@ export default function PostScreen() {
     setShowCategoryModal(false);
   };
 
-  const uploadImage = async (uri: string, index: number) => {
-    try {
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${user.id}/${Date.now()}-${index}.${fileExt}`;
-      
-      let fileData;
-      if (Platform.OS === 'web') {
-        const response = await fetch(uri);
-        fileData = await response.blob();
-      } else {
-        const base64 = await FileSystem.readAsStringAsync(uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        const byteCharacters = atob(base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        fileData = new Blob([byteArray], { type: `image/${fileExt}` });
-      }
-
-      const { data, error } = await supabase.storage
-        .from('listings')
-        .upload(fileName, fileData, {
-          contentType: `image/${fileExt}`,
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('listings')
-        .getPublicUrl(fileName);
-
-      return publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw error;
-    }
-  };
-
   const handleSubmit = async () => {
     if (!user?.phone || !user?.location) {
       Alert.alert(
@@ -144,20 +115,7 @@ export default function PostScreen() {
       if (userError) throw userError;
 
       if (!userData || userData.credits <= 0) {
-        Alert.alert(
-          'Crédits insuffisants',
-          'Vous avez utilisé votre crédit gratuit. Veuillez acheter plus de crédits pour continuer.',
-          [
-            {
-              text: 'Acheter des crédits',
-              onPress: () => router.push('/profile'),
-            },
-            {
-              text: 'Annuler',
-              style: 'cancel',
-            },
-          ]
-        );
+        setShowNoCreditsPopup(true);
         setIsSubmitting(false);
         return;
       }
@@ -184,7 +142,7 @@ export default function PostScreen() {
               fileData = await response.blob();
             } else {
               const base64 = await FileSystem.readAsStringAsync(uri, {
-                encoding: FileSystem.EncodingType.Base64,
+                encoding: 'base64',
               });
               const byteCharacters = atob(base64);
               const byteNumbers = new Array(byteCharacters.length);
@@ -242,8 +200,9 @@ export default function PostScreen() {
 
       if (creditError) throw creditError;
 
-      Alert.alert('Succès', 'Votre annonce a été publiée avec succès !');
-      router.push('/profile');
+      setNewListingId(data.id);
+      setShowSuccessPopup(true);
+      resetForm();
     } catch (error) {
       console.error('Error submitting listing:', error);
       Alert.alert('Erreur', 'Une erreur est survenue lors de la publication de votre annonce. Veuillez réessayer.');
@@ -298,9 +257,10 @@ export default function PostScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.form}>
-        <Text style={styles.title}>Publier une annonce</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView>
+        <View style={styles.form}>
+          <Text style={styles.title}>Publier une annonce</Text>
 
         {/* Images First */}
         <View style={styles.inputGroup}>
@@ -440,6 +400,33 @@ export default function PostScreen() {
         </View>
       </Modal>
     </ScrollView>
+    <Popup
+        visible={showSuccessPopup}
+        title="Votre annonce a été publiée avec succès !"
+        message="Souhaitez-vous voir votre annonce ?"
+        buttonText="Voir l’annonce"
+        onClose={() => {
+          setShowSuccessPopup(false);
+        }}
+        onConfirm={() => {
+          setShowSuccessPopup(false);
+          if (newListingId) {
+            router.push(`/listing/${newListingId}`);
+          }
+        }}
+      />
+      <Popup
+        visible={showNoCreditsPopup}
+        title="Vous n’avez plus de crédits."
+        message="Veuillez acheter des crédits pour continuer à publier des annonces."
+        buttonText="Acheter des crédits"
+        onClose={() => setShowNoCreditsPopup(false)}
+        onConfirm={() => {
+          setShowNoCreditsPopup(false);
+          router.push('/(tabs)/profile');
+        }}
+      />
+  </SafeAreaView>
   );
 }
 
@@ -449,36 +436,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   messageCard: {
-    margin: 24,
+    margin: 16,
     backgroundColor: '#f0fdf4',
     borderRadius: 12,
-    padding: 24,
+    padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#16a34a',
+    borderLeftColor: '#9bbd1f',
   },
   messageTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#16a34a',
+    color: '#9bbd1f',
     marginBottom: 8,
   },
   messageText: {
     fontSize: 14,
     color: '#334155',
-    marginBottom: 24,
+    marginBottom: 16,
     lineHeight: 20,
   },
   form: {
-    padding: 24,
+    padding: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: '600',
-    marginBottom: 24,
+    marginBottom: 16,
     color: '#0f172a',
   },
   inputGroup: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
@@ -490,7 +477,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 8,
-    padding: 12,
+    padding: 8,
     fontSize: 16,
     backgroundColor: '#fff',
   },
@@ -567,7 +554,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   button: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -590,13 +577,13 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '70%',
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -626,12 +613,12 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   categoryItemTextSelected: {
-    color: '#16a34a',
+    color: '#9bbd1f',
     fontWeight: '500',
   },
   checkmark: {
     fontSize: 18,
-    color: '#16a34a',
+    color: '#9bbd1f',
     fontWeight: '600',
   },
 });

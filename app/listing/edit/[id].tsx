@@ -5,17 +5,20 @@ import {
   StyleSheet,
   TextInput,
   ScrollView,
+  Platform,
   TouchableOpacity,
   ActivityIndicator,
   Image,
   Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
 import { ListingWithDetails, ListingCondition, Category } from '@/types/database';
 
 export default function EditListingScreen() {
@@ -135,97 +138,128 @@ export default function EditListingScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#16a34a" />
-      </View>
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#9bbd1f" />
+        <Text>Chargement des détails de l'annonce...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!listing) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Annonce non trouvée.</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.form}>
-        <Text style={styles.label}>Titre *</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.title}
-          onChangeText={(text) => setFormData({ ...formData, title: text })}
-          placeholder="Titre de l'annonce"
-        />
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView>
+          <View style={styles.form}>
+            <Text style={styles.label}>Titre *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.title}
+              onChangeText={(text) => setFormData({ ...formData, title: text })}
+              placeholder="Titre de l'annonce"
+            />
 
-        <Text style={styles.label}>Description</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={formData.description}
-          onChangeText={(text) => setFormData({ ...formData, description: text })}
-          placeholder="Description détaillée de l'article"
-          multiline
-          numberOfLines={4}
-        />
+            <Text style={styles.label}>Description</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={formData.description}
+              onChangeText={(text) => setFormData({ ...formData, description: text })}
+              placeholder="Description détaillée de l'article"
+              multiline
+              numberOfLines={4}
+            />
 
-        <Text style={styles.label}>Prix *</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.price}
-          onChangeText={(text) => setFormData({ ...formData, price: text.replace(/[^0-9]/g, '') })}
-          placeholder="Prix en USD"
-          keyboardType="numeric"
-        />
+            <Text style={styles.label}>Prix *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.price}
+              onChangeText={(text) =>
+                setFormData({ ...formData, price: text.replace(/[^0-9]/g, '') })
+              }
+              placeholder="Prix en USD"
+              keyboardType="numeric"
+            />
 
-        <Text style={styles.label}>Catégorie *</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.category_id}
-            onValueChange={(value) => setFormData({ ...formData, category_id: value })}
-            style={styles.picker}
-          >
-            <Picker.Item label="Sélectionner une catégorie" value="" />
-            {categories.map((category) => (
-              <Picker.Item
-                key={category.id}
-                label={category.name}
-                value={category.id}
-              />
-            ))}
-          </Picker>
-        </View>
+            <Text style={styles.label}>Catégorie *</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={formData.category_id}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, category_id: value })
+                }
+                style={styles.picker}
+              >
+                <Picker.Item label="Sélectionner une catégorie" value="" />
+                {categories.map((category) => (
+                  <Picker.Item
+                    key={category.id}
+                    label={category.name}
+                    value={category.id}
+                  />
+                ))}
+              </Picker>
+            </View>
 
-        <Text style={styles.label}>État *</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.condition}
-            onValueChange={(value) => setFormData({ ...formData, condition: value })}
-            style={styles.picker}
-          >
-            <Picker.Item label="Sélectionner l'état" value="" />
-            <Picker.Item label="Neuf" value="new" />
-            <Picker.Item label="Comme neuf" value="like_new" />
-            <Picker.Item label="Bon état" value="good" />
-            <Picker.Item label="État moyen" value="fair" />
-            <Picker.Item label="À rénover" value="poor" />
-          </Picker>
-        </View>
+            <Text style={styles.label}>État *</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={formData.condition}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, condition: value })
+                }
+                style={styles.picker}
+              >
+                <Picker.Item label="Sélectionner l'état" value="" />
+                <Picker.Item label="Neuf" value="new" />
+                <Picker.Item label="Comme neuf" value="like_new" />
+                <Picker.Item label="Bon état" value="good" />
+                <Picker.Item label="État moyen" value="fair" />
+                <Picker.Item label="À rénover" value="poor" />
+              </Picker>
+            </View>
 
-        <Text style={styles.label}>Localisation *</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.location}
-          onChangeText={(text) => setFormData({ ...formData, location: text })}
-          placeholder="Ex: Kinshasa, Gombe"
-        />
+            <Text style={styles.label}>Localisation *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.location}
+              onChangeText={(text) =>
+                setFormData({ ...formData, location: text })
+              }
+              placeholder="Ex: Kinshasa, Gombe"
+            />
 
-        <TouchableOpacity
-          style={[styles.submitButton, saving && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>Enregistrer les modifications</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                saving && styles.submitButtonDisabled,
+              ]}
+              onPress={handleSubmit}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.submitButtonText}>
+                  Enregistrer les modifications
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -265,7 +299,7 @@ const styles = StyleSheet.create({
     height: 50,
   },
   submitButton: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
@@ -275,7 +309,12 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
   },
 });

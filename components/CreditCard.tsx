@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
   credits: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#16a34a',
+    color: '#9bbd1f',
     marginBottom: 8,
   },
   price: {
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   button: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,

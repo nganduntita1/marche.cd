@@ -9,22 +9,17 @@ import {
   ActivityIndicator,
   RefreshControl,
   Modal,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Search, MapPin, X } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ListingWithDetails, Category } from '@/types/database';
 import ListingCard from '@/components/ListingCard';
 
-const PREDEFINED_LOCATIONS = [
-  'Kinshasa, Gombe',
-  'Kinshasa, Bandalungwa',
-  'Kinshasa, Lingwala',
-  'Kinshasa, Barumbu',
-  'Kinshasa, Lemba',
-  'Kinshasa, Limete',
-];
+// Major cities in DRC (includes user examples like Kipushi & Lubumbashi)
+// Location picker disabled for now
 
 export default function HomeScreen() {
   const [listings, setListings] = useState<ListingWithDetails[]>([]);
@@ -33,8 +28,7 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showLocationModal, setShowLocationModal] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  // Location picker disabled for now
   const router = useRouter();
 
   useEffect(() => {
@@ -73,9 +67,7 @@ export default function HomeScreen() {
         query = query.eq('category_id', selectedCategory);
       }
 
-      if (selectedLocation) {
-        query = query.eq('location', selectedLocation);
-      }
+      // Location filtering disabled for now
 
       const { data, error } = await query;
 
@@ -89,10 +81,7 @@ export default function HomeScreen() {
     }
   };
 
-  const handleLocationSelect = (location: string) => {
-    setSelectedLocation(location === selectedLocation ? null : location);
-    setShowLocationModal(false);
-  };
+  // Location selection disabled for now
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -106,8 +95,8 @@ export default function HomeScreen() {
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <Text style={styles.logo}>Marché.cd</Text>
-      <Text style={styles.subtitle}>Marketplace local de RDC</Text>
+      <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
+      {/* <Text style={styles.subtitle}>Marketplace local de RDC</Text> */}
 
       <View style={styles.searchContainer}>
         <Search size={20} color="#94a3b8" style={styles.searchIcon} />
@@ -117,23 +106,10 @@ export default function HomeScreen() {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowLocationModal(true)}
-        >
-          <MapPin size={20} color={selectedLocation ? '#16a34a' : '#94a3b8'} />
-        </TouchableOpacity>
+        {/* Location filter disabled */}
       </View>
 
-      {selectedLocation && (
-        <View style={styles.locationChip}>
-          <MapPin size={16} color="#16a34a" />
-          <Text style={styles.locationChipText}>{selectedLocation}</Text>
-          <TouchableOpacity onPress={() => setSelectedLocation(null)}>
-            <X size={16} color="#64748b" />
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Location chip disabled */}
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -176,23 +152,26 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.container}>
         {renderHeader()}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#16a34a" />
+          <ActivityIndicator size="large" color="#9bbd1f" />
         </View>
       </SafeAreaView>
     );
   }
 
-  const renderItem = ({ item }: { item: ListingWithDetails }) => (
-    <View style={styles.listingCardContainer}>
-      <ListingCard
-        id={item.id}
-        title={item.title}
-        price={item.price}
-        image={item.images[0]}
-        status={item.status}
-      />
-    </View>
-  );
+  const renderItem = ({ item }: { item: ListingWithDetails }) => {
+    const coercedStatus: 'active' | 'sold' = item.status === 'sold' ? 'sold' : 'active';
+    return (
+      <View style={styles.listingCardContainer}>
+        <ListingCard
+          id={item.id}
+          title={item.title}
+          price={item.price}
+          image={item.images[0]}
+          status={coercedStatus}
+        />
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -200,7 +179,7 @@ export default function HomeScreen() {
       
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#16a34a" />
+          <ActivityIndicator size="large" color="#9bbd1f" />
         </View>
       ) : (
         <FlatList
@@ -223,53 +202,7 @@ export default function HomeScreen() {
           }
         />
       )}
-      <Modal
-        visible={showLocationModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowLocationModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowLocationModal(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choisir une localisation</Text>
-              <TouchableOpacity onPress={() => setShowLocationModal(false)}>
-                <X size={24} color="#334155" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.locationList}>
-              {PREDEFINED_LOCATIONS.map((location) => (
-                <TouchableOpacity
-                  key={location}
-                  style={[
-                    styles.locationOption,
-                    location === selectedLocation && styles.locationOptionActive,
-                  ]}
-                  onPress={() => handleLocationSelect(location)}
-                >
-                  <MapPin
-                    size={20}
-                    color={location === selectedLocation ? '#16a34a' : '#64748b'}
-                  />
-                  <Text
-                    style={[
-                      styles.locationOptionText,
-                      location === selectedLocation && styles.locationOptionTextActive,
-                    ]}
-                  >
-                    {location}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      {/* Location modal disabled */}
     </SafeAreaView>
   );
 }
@@ -280,15 +213,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
-    padding: 24,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
-    backgroundColor: '#fff',
+    backgroundColor: '#bedc39',
   },
-  logo: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#16a34a',
+  logoImage: {
+    width: '100%',
+    height: 56,
+    borderRadius: 12,
   },
   subtitle: {
     fontSize: 14,
@@ -302,27 +235,36 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     marginTop: 16,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   searchIcon: {
-    marginRight: 12,
+    marginRight: 8,
+  },
+  filterButton: {
+    padding: 8,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 8,
     fontSize: 16,
     color: '#0f172a',
   },
   listingsContainer: {
-    padding: 12,
+    padding: 16,
+  },
+  categoriesContainer: {
+    paddingHorizontal: 16,
+  },
+  categoriesList: {
+    marginBottom: 8,
   },
   row: {
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
   },
   listingCardContainer: {
     width: '48%',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -330,7 +272,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyState: {
-    padding: 24,
+    padding: 16,
     alignItems: 'center',
   },
   emptyStateText: {
@@ -346,7 +288,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   categoryChipActive: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#9bbd1f',
   },
   categoryChipText: {
     fontSize: 14,
@@ -361,15 +303,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f0fdf4',
     borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 8,
     alignSelf: 'flex-start',
-    gap: 6,
+    gap: 8,
   },
   locationChipText: {
     fontSize: 14,
-    color: '#16a34a',
+    color: '#9bbd1f',
     fontWeight: '500',
   },
   modalOverlay: {
@@ -383,13 +325,28 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     width: '90%',
     maxWidth: 400,
-    padding: 24,
+    padding: 16,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  locationSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  citySearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0f172a',
   },
   modalTitle: {
     fontSize: 18,
@@ -397,13 +354,13 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   locationList: {
-    gap: 12,
+    gap: 8,
   },
   locationOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
+    gap: 8,
+    paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
     backgroundColor: '#f8fafc',
@@ -416,7 +373,7 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   locationOptionTextActive: {
-    color: '#16a34a',
+    color: '#9bbd1f',
     fontWeight: '500',
   },
 });
