@@ -62,6 +62,38 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleDeleteListing = async (listingId: string) => {
+    Alert.alert(
+      'Supprimer l\'annonce',
+      'Êtes-vous sûr de vouloir supprimer cette annonce ? Cette action est irréversible.',
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('listings')
+                .delete()
+                .eq('id', listingId);
+
+              if (error) throw error;
+              await fetchUserListings();
+              Alert.alert('Succès', 'L\'annonce a été supprimée avec succès.');
+            } catch (error) {
+              console.error('Error deleting listing:', error);
+              Alert.alert('Erreur', 'Une erreur est survenue lors de la suppression de l\'annonce.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchUserListings();
@@ -133,6 +165,7 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
         {/* <Text style={styles.tagline}>Mon profil</Text> */}
+        {/* eas build --platform android --profile preview */}
       </View>
 
       <View style={styles.profileSection}>
@@ -223,16 +256,24 @@ export default function ProfileScreen() {
                   image={listing.images[0]}
                   status={listing.status}
                 />
-                {listing.status === 'active' && (
+                <View style={styles.listingActions}>
+                  {listing.status === 'active' && (
+                    <TouchableOpacity
+                      style={styles.markAsSoldButton}
+                      onPress={() => handleMarkAsSold(listing.id)}
+                    >
+                      <Text style={styles.markAsSoldButtonText}>
+                        Marquer vendu
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
-                    style={styles.markAsSoldButton}
-                    onPress={() => handleMarkAsSold(listing.id)}
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteListing(listing.id)}
                   >
-                    <Text style={styles.markAsSoldButtonText}>
-                      Marquer comme vendu
-                    </Text>
+                    <Text style={styles.deleteButtonText}>🗑️</Text>
                   </TouchableOpacity>
-                )}
+                </View>
               </View>
             ))}
           </View>
@@ -434,6 +475,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: '#334155',
+  },
+  listingActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
+  },
+  deleteButton: {
+    backgroundColor: '#fef2f2',
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  deleteButtonText: {
+    fontSize: 16,
   },
   creditInfo: {
     marginVertical: 16,

@@ -68,8 +68,7 @@ export default function PostScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
       quality: 0.8,
     });
 
@@ -87,20 +86,7 @@ export default function PostScreen() {
     setShowCategoryModal(false);
   };
 
-  // Helper function to convert base64 to ArrayBuffer
-  const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-    try {
-      const binaryString = atob(base64);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      return bytes.buffer;
-    } catch (e) {
-      throw new Error(`Erreur lors de la conversion base64 en ArrayBuffer: ${e.message}`);
-    }
-  };
+
 
   const handleSubmit = async () => {
     if (!user?.phone || !user?.location) {
@@ -153,25 +139,21 @@ export default function PostScreen() {
             const ext = (uri.split('.').pop()?.split(/[\?\#]/)[0] ?? 'jpg').toLowerCase();
             const fileName = `${user.id}/${Date.now()}-${idx}.${ext}`;
 
-            // 2. Read image as base64
-            const base64 = await FileSystem.readAsStringAsync(uri, {
-              encoding: 'base64',
-            });
+            // 2. Fetch image as blob
+            const response = await fetch(uri);
+            const blob = await response.blob();
 
-            // 3. Convert to ArrayBuffer
-            const arrayBuffer = base64ToArrayBuffer(base64);
-
-            // 4. Upload to Supabase
+            // 3. Upload to Supabase
             const { error: upErr } = await supabase.storage
               .from('listings')
-              .upload(fileName, arrayBuffer, {
+              .upload(fileName, blob, {
                 contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
                 cacheControl: '3600',
                 upsert: false,
               });
             if (upErr) throw new Error(`Erreur d'upload: ${upErr.message}`);
 
-            // 5. Get public URL
+            // 4. Get public URL
             const { data: urlData } = supabase.storage
               .from('listings')
               .getPublicUrl(fileName);
@@ -417,7 +399,7 @@ const styles = StyleSheet.create({
   removeButton: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.5)', width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   removeButtonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
   addImageButton: { width: 100, height: 100, borderRadius: 8, borderWidth: 2, borderColor: '#e2e8f0', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc' },
-  addImageButtonText: { fontSize: 32, color: '#94a3b8' },
+  addImageButtonText: { fontSize: 20, color: '#94a3b8' },
   addImageHintText: { fontSize: 12, color: '#94a3b8', marginTop: 4 },
   button: { backgroundColor: '#9bbd1f', padding: 16, borderRadius: 8, alignItems: 'center' },
   buttonDisabled: { opacity: 0.5 },
