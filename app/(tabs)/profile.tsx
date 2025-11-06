@@ -132,7 +132,7 @@ export default function ProfileScreen() {
     >
       <View style={styles.header}>
         <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-        <Text style={styles.tagline}>Mon profil</Text>
+        {/* <Text style={styles.tagline}>Mon profil</Text> */}
       </View>
 
       <View style={styles.profileSection}>
@@ -253,6 +253,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
+    backgroundColor: '#bedc39',
   },
   logoImage: {
     width: '100%',

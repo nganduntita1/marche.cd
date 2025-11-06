@@ -161,16 +161,16 @@ export default function HomeScreen() {
   const renderItem = ({ item }: { item: ListingWithDetails }) => {
     const coercedStatus: 'active' | 'sold' = item.status === 'sold' ? 'sold' : 'active';
     return (
-      <View style={styles.listingCardContainer}>
-        <ListingCard
-          id={item.id}
-          title={item.title}
-          price={item.price}
-          image={item.images[0]}
+    <View style={styles.listingCardContainer}>
+      <ListingCard
+        id={item.id}
+        title={item.title}
+        price={item.price}
+        image={item.images[0]}
           status={coercedStatus}
-        />
-      </View>
-    );
+      />
+    </View>
+  );
   };
 
   return (

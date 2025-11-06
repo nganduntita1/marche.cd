@@ -125,16 +125,19 @@ export default function CompleteProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#bedc39',
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
   },
   header: {
     alignItems: 'center',
     marginBottom: 32,
+    width: '100%',
+    paddingHorizontal: 16,
   },
   logoImage: {
     width: '100%',
@@ -148,6 +151,11 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
   },
   title: {
     fontSize: 24,
