@@ -12,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -66,37 +67,50 @@ export default function CompleteProfileScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <LinearGradient
+          colors={['#bedc39', '#9bbd1f']}
+          style={styles.header}
+        >
           <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
           <Text style={styles.tagline}>Complétez votre profil</Text>
-        </View>
+        </LinearGradient>
 
-        <View style={styles.form}>
+        <View style={styles.formCard}>
+          <View style={styles.iconContainer}>
+            <Text style={styles.iconText}>✨</Text>
+          </View>
+          
           <Text style={styles.title}>Informations supplémentaires</Text>
           <Text style={styles.subtitle}>
             Ces informations sont nécessaires pour poster des annonces
           </Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Numéro WhatsApp</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="+243..."
-              value={whatsapp}
-              onChangeText={setWhatsapp}
-              keyboardType="phone-pad"
-            />
+            <Text style={styles.label}>📱 Numéro WhatsApp</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="+243..."
+                value={whatsapp}
+                onChangeText={setWhatsapp}
+                keyboardType="phone-pad"
+                placeholderTextColor="#94a3b8"
+              />
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Ville</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Kinshasa, Lubumbashi, etc."
-              value={location}
-              onChangeText={setLocation}
-            />
+            <Text style={styles.label}>📍 Ville</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Kinshasa, Lubumbashi, etc."
+                value={location}
+                onChangeText={setLocation}
+                placeholderTextColor="#94a3b8"
+              />
+            </View>
           </View>
 
           <TouchableOpacity
@@ -104,16 +118,21 @@ export default function CompleteProfileScreen() {
             onPress={handleComplete}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>
-              {loading ? 'Enregistrement...' : 'Compléter mon profil'}
-            </Text>
+            <LinearGradient
+              colors={loading ? ['#94a3b8', '#64748b'] : ['#9bbd1f', '#7da01a']}
+              style={styles.buttonGradient}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? '⏳ Enregistrement...' : '🚀 Compléter mon profil'}
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.skipButton}
             onPress={() => router.replace('/(tabs)')}
           >
-            <Text style={styles.skipText}>Compléter plus tard</Text>
+            <Text style={styles.skipText}>⏭️ Compléter plus tard</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -125,88 +144,131 @@ export default function CompleteProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#bedc39',
+    backgroundColor: '#f8fafc',
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 32,
-    width: '100%',
-    paddingHorizontal: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    borderRadius: 20,
+    marginHorizontal: 4,
   },
   logoImage: {
     width: '100%',
     height: 64,
     borderRadius: 12,
-    marginBottom: 8,
+    marginBottom: 16,
   },
   tagline: {
-    fontSize: 16,
-    color: '#64748b',
+    fontSize: 20,
+    color: '#fff',
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
-  form: {
-    width: '100%',
-    maxWidth: 420,
+  formCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 16,
+    borderRadius: 24,
+    padding: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
+    marginHorizontal: 4,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 24,
+  },
+  iconText: {
+    fontSize: 32,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#0f172a',
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 12,
+    color: '#1e293b',
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#64748b',
-    marginBottom: 16,
+    marginBottom: 32,
+    textAlign: 'center',
+    lineHeight: 24,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 24,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-    color: '#334155',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#1e293b',
+  },
+  inputContainer: {
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   input: {
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#e2e8f0',
-    borderRadius: 8,
-    padding: 8,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     fontSize: 16,
     backgroundColor: '#fff',
+    color: '#1e293b',
   },
   button: {
-    backgroundColor: '#9bbd1f',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
+    borderRadius: 16,
+    marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  skipButton: {
-    marginTop: 16,
+  buttonGradient: {
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    borderRadius: 16,
     alignItems: 'center',
   },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  skipButton: {
+    marginTop: 24,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
   skipText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#64748b',
-    textDecorationLine: 'underline',
+    fontWeight: '500',
   },
 });

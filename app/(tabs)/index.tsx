@@ -12,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
@@ -96,20 +97,19 @@ export default function HomeScreen() {
   const renderHeader = () => (
     <View style={styles.header}>
       <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-      {/* <Text style={styles.subtitle}>Marketplace local de RDC</Text> */}
+      <Text style={styles.subtitle}>Marketplace local de RDC</Text>
 
       <View style={styles.searchContainer}>
-        <Search size={20} color="#94a3b8" style={styles.searchIcon} />
+        <Search size={20} color="#64748b" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Rechercher des articles..."
+          placeholderTextColor="#94a3b8"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
-        {/* Location filter disabled */}
       </View>
 
-      {/* Location chip disabled */}
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -191,12 +191,18 @@ export default function HomeScreen() {
           columnWrapperStyle={styles.row}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              colors={['#9bbd1f']}
+              tintColor="#9bbd1f"
+            />
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
+              <Text style={styles.emptyStateTitle}>Aucune annonce trouvée</Text>
               <Text style={styles.emptyStateText}>
-                Aucune annonce trouvée
+                Essayez de modifier vos critères de recherche ou explorez d'autres catégories
               </Text>
             </View>
           }
@@ -214,19 +220,21 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
+    backgroundColor: '#bedc39',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
-    backgroundColor: '#bedc39',
   },
   logoImage: {
     width: '100%',
     height: 56,
     borderRadius: 12,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
     color: '#64748b',
-    marginTop: 4,
+    textAlign: 'center',
+    marginBottom: 16,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -234,51 +242,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderRadius: 12,
     paddingHorizontal: 16,
-    marginTop: 16,
     marginBottom: 16,
   },
   searchIcon: {
     marginRight: 8,
   },
-  filterButton: {
-    padding: 8,
-  },
   searchInput: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 12,
     fontSize: 16,
-    color: '#0f172a',
-  },
-  listingsContainer: {
-    padding: 16,
+    color: '#1e293b',
   },
   categoriesContainer: {
     paddingHorizontal: 16,
   },
   categoriesList: {
     marginBottom: 8,
-  },
-  row: {
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-  },
-  listingCardContainer: {
-    width: '48%',
-    marginBottom: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyState: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#64748b',
-    textAlign: 'center',
   },
   categoryChip: {
     paddingHorizontal: 16,
@@ -297,6 +276,39 @@ const styles = StyleSheet.create({
   },
   categoryChipTextActive: {
     color: '#fff',
+  },
+  listingsContainer: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+  row: {
+    justifyContent: 'space-between',
+  },
+  listingCardContainer: {
+    width: '48%',
+    marginBottom: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyState: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 24,
   },
   locationChip: {
     flexDirection: 'row',

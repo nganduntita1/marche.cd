@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -125,25 +126,27 @@ export default function ProfileScreen() {
   if (!user) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.gradientHeader}>
           <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
           <Text style={styles.tagline}>Connectez-vous pour continuer</Text>
         </View>
 
-        <View style={styles.messageCard}>
-          <Text style={styles.messageTitle}>
-            Connexion requise
-          </Text>
-          <Text style={styles.messageText}>
-            Pour accéder à votre profil et gérer vos annonces, vous devez d'abord vous connecter.
-          </Text>
-          
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => router.push('/auth/login')}
-          >
-            <Text style={styles.buttonText}>Se connecter</Text>
-          </TouchableOpacity>
+        <View style={styles.messageContainer}>
+          <View style={styles.messageCard}>
+            <Text style={styles.messageTitle}>
+              Connexion requise
+            </Text>
+            <Text style={styles.messageText}>
+              Pour accéder à votre profil et gérer vos annonces, vous devez d'abord vous connecter.
+            </Text>
+            
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => router.push('/auth/login')}
+            >
+              <Text style={styles.buttonText}>Se connecter</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -153,6 +156,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView 
         style={styles.container}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -161,14 +165,14 @@ export default function ProfileScreen() {
           tintColor="#9bbd1f"
         />
       }
+      showsVerticalScrollIndicator={false}
     >
-      <View style={styles.header}>
+      <View style={styles.gradientHeader}>
         <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-        {/* <Text style={styles.tagline}>Mon profil</Text> */}
-        {/* eas build --platform android --profile preview */}
+        {/* <Text style={styles.headerTitle}>Mon Profil</Text> */}
       </View>
 
-      <View style={styles.profileSection}>
+      <View style={styles.profileCard}>
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             <Text style={styles.avatarText}>
@@ -177,38 +181,41 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.emailText}>{user.email}</Text>
-            <Text style={styles.phoneText}>{user.phone || 'Aucun numéro'}</Text>
-            <Text style={styles.locationText}>{user.location || 'Aucune ville'}</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.phoneText}>{user.phone || 'Aucun numéro'}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.locationText}>{user.location || 'Aucune ville'}</Text>
+            </View>
           </View>
-        </View>
-
-        <View style={styles.creditInfo}>
-          <Text style={styles.creditLabel}>Crédits disponibles</Text>
-          <View style={styles.creditBadge}>
-            <Text style={styles.creditValue}>{credits || 0}</Text>
+          <View style={styles.creditContainer}>
+            <View style={styles.creditCircle}>
+              <Text style={styles.creditNumber}>{credits || 0}</Text>
+            </View>
+            <Text style={styles.creditLabel}>Crédits</Text>
           </View>
         </View>
 
         <View style={styles.actionButtons}>
           {(!user.phone || !user.location) && (
             <TouchableOpacity
-              style={[styles.actionButton, styles.actionButtonHighlight]}
+              style={styles.modernActionButton}
               onPress={() => router.push('/auth/complete-profile')}
             >
-              <Text style={[styles.actionButtonText, { color: '#fff' }]}>
+              <Text style={styles.actionButtonText}>
                 Compléter mon profil
               </Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.actionButton} onPress={signOut}>
-            <Text style={styles.actionButtonText}>Se déconnecter</Text>
+          <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
+            <Text style={styles.logoutButtonText}>Se déconnecter</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.creditsSection}>
         <Text style={styles.sectionTitle}>Acheter des crédits</Text>
-        <Text style={[styles.messageText, { marginTop: 8, marginBottom: 16 }]}>
+        <Text style={styles.sectionSubtitle}>
           Achetez des crédits pour publier vos annonces. Chaque annonce coûte 1 crédit.
         </Text>
         <View style={styles.listingsGrid}>
@@ -230,7 +237,7 @@ export default function ProfileScreen() {
         </View>
 
         {listings.length === 0 ? (
-          <View style={styles.emptyState}>
+          <View style={styles.emptyStateCard}>
             <Text style={styles.emptyStateTitle}>Aucune annonce</Text>
             <Text style={styles.emptyStateText}>
               Vous n'avez pas encore publié d'annonces.
@@ -271,7 +278,7 @@ export default function ProfileScreen() {
                     style={styles.deleteButton}
                     onPress={() => handleDeleteListing(listing.id)}
                   >
-                    <Text style={styles.deleteButtonText}>🗑️</Text>
+                    <Text style={styles.deleteButtonText}>×</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -289,25 +296,39 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  gradientHeader: {
     alignItems: 'center',
     paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#bedc39',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
-    backgroundColor: '#bedc39',
   },
   logoImage: {
     width: '100%',
     height: 64,
     borderRadius: 12,
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1e293b',
   },
   tagline: {
     fontSize: 16,
     color: '#64748b',
   },
+  
+  messageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 16,
+  },
   messageCard: {
-    margin: 16,
     backgroundColor: '#f0fdf4',
     borderRadius: 12,
     padding: 16,
@@ -326,128 +347,314 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 20,
   },
-  profileSection: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+
+  profileCard: {
+    backgroundColor: '#fff',
+    margin: 16,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   avatarContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: '#9bbd1f',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
+    shadowColor: '#9bbd1f',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   avatarText: {
-    fontSize: 24,
-    fontWeight: '600',
+    fontSize: 28,
+    fontWeight: '700',
     color: '#fff',
   },
   profileInfo: {
     flex: 1,
   },
   emailText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#334155',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  infoRow: {
     marginBottom: 4,
   },
   phoneText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#64748b',
-    marginBottom: 2,
+    fontWeight: '500',
   },
   locationText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#64748b',
+    fontWeight: '500',
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+  creditContainer: {
     alignItems: 'center',
   },
-  actionButtonHighlight: {
+  creditCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#9bbd1f',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    shadowColor: '#9bbd1f',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  creditNumber: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  creditLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
+  // Credit section styles
+  creditSection: {
+    marginBottom: 24,
+  },
+  creditCard: {
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+  },
+
+  creditBadge: {
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  creditBadgeGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+  },
+  creditValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+  },
+
+  // Action buttons
+  actionButtons: {
+    gap: 12,
+  },
+  modernActionButton: {
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  buttonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
   },
   actionButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#334155',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  logoutButton: {
+    backgroundColor: '#f8fafc',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+
+  // Section styles
+  creditsSection: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
   listingsSection: {
     padding: 16,
+  },
+  sectionHeaderCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#334155',
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    lineHeight: 20,
+    marginBottom: 16,
   },
   newListingButton: {
-    backgroundColor: '#9bbd1f',
-    paddingVertical: 8,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  newListingButtonGradient: {
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   newListingButtonText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#fff',
   },
-  emptyState: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 16,
+
+  // Empty state
+  emptyStateCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 32,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyStateIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyStateEmoji: {
+    fontSize: 32,
   },
   emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#334155',
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 12,
   },
   emptyStateText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#64748b',
     textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 20,
+    lineHeight: 24,
+    marginBottom: 24,
   },
   emptyStateButton: {
-    backgroundColor: '#9bbd1f',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   emptyStateButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#fff',
+  },
+
+  // Listings grid
+  creditsGrid: {
+    gap: 12,
   },
   listingsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
+    gap: 12,
   },
+  listingContainer: {
+    width: '48%',
+    marginBottom: 16,
+  },
+  listingActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  markAsSoldButton: {
+    flex: 1,
+    backgroundColor: '#f0fdf4',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  markAsSoldButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#16a34a',
+  },
+  deleteButton: {
+    backgroundColor: '#fef2f2',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  deleteButtonText: {
+    fontSize: 16,
+  },
+
+  // Button styles
   button: {
     backgroundColor: '#9bbd1f',
     padding: 16,
@@ -459,63 +666,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  listingContainer: {
-    width: '48%',
-    marginBottom: 16,
-  },
-  markAsSoldButton: {
-    backgroundColor: '#f1f5f9',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    marginTop: 8,
-    alignItems: 'center',
-  },
-  markAsSoldButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#334155',
-  },
-  listingActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 8,
-  },
-  deleteButton: {
-    backgroundColor: '#fef2f2',
-    padding: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-  },
-  deleteButtonText: {
-    fontSize: 16,
-  },
-  creditInfo: {
-    marginVertical: 16,
-    alignItems: 'center',
-  },
-  creditLabel: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 8,
-  },
-  creditBadge: {
-    backgroundColor: '#9bbd1f',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-  },
-  creditValue: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  creditsSection: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
+
 });

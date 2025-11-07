@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type PopupProps = {
   visible: boolean;
@@ -11,6 +12,23 @@ type PopupProps = {
 };
 
 export default function Popup({ visible, title, message, buttonText, onClose, onConfirm }: PopupProps) {
+  const getIcon = () => {
+    if (title.toLowerCase().includes('succès') || title.toLowerCase().includes('publiée')) return '🎉';
+    if (title.toLowerCase().includes('crédit') || title.toLowerCase().includes('épuisé')) return '💳';
+    if (title.toLowerCase().includes('erreur')) return '❌';
+    return '✨';
+  };
+
+  const getButtonColors = () => {
+    if (title.toLowerCase().includes('crédit') || title.toLowerCase().includes('épuisé')) {
+      return ['#9bbd1f', '#7da01a'];
+    }
+    if (title.toLowerCase().includes('erreur')) {
+      return ['#ef4444', '#dc2626'];
+    }
+    return ['#9bbd1f', '#7da01a'];
+  };
+
   return (
     <Modal
       transparent={true}
@@ -22,11 +40,24 @@ export default function Popup({ visible, title, message, buttonText, onClose, on
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <View style={styles.popup}>
-              <Text style={styles.title}>{title}</Text>
-              <Text style={styles.message}>{message}</Text>
-              <TouchableOpacity style={styles.button} onPress={onConfirm}>
-                <Text style={styles.buttonText}>{buttonText}</Text>
-              </TouchableOpacity>
+              <LinearGradient
+                colors={['#ffffff', '#f8fafc']}
+                style={styles.popupGradient}
+              >
+                <View style={styles.iconContainer}>
+                  <Text style={styles.icon}>{getIcon()}</Text>
+                </View>
+                <Text style={styles.title}>{title}</Text>
+                <Text style={styles.message}>{message}</Text>
+                <TouchableOpacity style={styles.button} onPress={onConfirm}>
+                  <LinearGradient
+                    colors={getButtonColors()}
+                    style={styles.buttonGradient}
+                  >
+                    <Text style={styles.buttonText}>{buttonText}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </LinearGradient>
             </View>
           </TouchableWithoutFeedback>
         </View>
@@ -38,44 +69,67 @@ export default function Popup({ visible, title, message, buttonText, onClose, on
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   popup: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 24,
+    borderRadius: 24,
     marginHorizontal: 24,
-    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+    overflow: 'hidden',
+  },
+  popupGradient: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  icon: {
+    fontSize: 32,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: '700',
     color: '#1e293b',
     marginBottom: 12,
     textAlign: 'center',
   },
   message: {
     fontSize: 16,
-    color: '#475569',
+    color: '#64748b',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
+    lineHeight: 24,
   },
   button: {
-    backgroundColor: '#ef4444',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  buttonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+    alignItems: 'center',
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
