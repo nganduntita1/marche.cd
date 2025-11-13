@@ -64,6 +64,7 @@ export default function ProfileScreen() {
   };
 
   const handleDeleteListing = async (listingId: string) => {
+    console.log('Delete button pressed for listing:', listingId);
     Alert.alert(
       'Supprimer l\'annonce',
       'Êtes-vous sûr de vouloir supprimer cette annonce ? Cette action est irréversible.',
@@ -71,23 +72,31 @@ export default function ProfileScreen() {
         {
           text: 'Annuler',
           style: 'cancel',
+          onPress: () => console.log('Delete cancelled'),
         },
         {
           text: 'Supprimer',
           style: 'destructive',
           onPress: async () => {
+            console.log('Delete confirmed, attempting to delete listing:', listingId);
             try {
               const { error } = await supabase
                 .from('listings')
                 .delete()
-                .eq('id', listingId);
+                .eq('id', listingId)
+                .eq('seller_id', user?.id);
 
-              if (error) throw error;
+              if (error) {
+                console.error('Delete error:', error);
+                throw error;
+              }
+              
+              console.log('Delete successful');
               await fetchUserListings();
               Alert.alert('Succès', 'L\'annonce a été supprimée avec succès.');
-            } catch (error) {
+            } catch (error: any) {
               console.error('Error deleting listing:', error);
-              Alert.alert('Erreur', 'Une erreur est survenue lors de la suppression de l\'annonce.');
+              Alert.alert('Erreur', error.message || 'Une erreur est survenue lors de la suppression de l\'annonce.');
             }
           },
         },
@@ -105,6 +114,48 @@ export default function ProfileScreen() {
     if (user?.id) {
       fetchUserListings();
       fetchUserCredits();
+
+      // Set up real-time subscription for user's listings
+      const listingsSubscription = supabase
+        .channel('user-listings-channel')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'listings',
+            filter: `seller_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('Real-time listing update:', payload);
+            fetchUserListings();
+          }
+        )
+        .subscribe();
+
+      // Set up real-time subscription for user credits
+      const creditsSubscription = supabase
+        .channel('user-credits-channel')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'users',
+            filter: `id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('Real-time credits update:', payload);
+            fetchUserCredits();
+          }
+        )
+        .subscribe();
+
+      // Cleanup subscriptions on unmount
+      return () => {
+        supabase.removeChannel(listingsSubscription);
+        supabase.removeChannel(creditsSubscription);
+      };
     }
   }, [user?.id]);
 
@@ -125,6 +176,7 @@ export default function ProfileScreen() {
 
   if (!user) {
     return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.gradientHeader}>
           <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
@@ -149,11 +201,13 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
       <ScrollView 
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
@@ -267,7 +321,11 @@ export default function ProfileScreen() {
                   {listing.status === 'active' && (
                     <TouchableOpacity
                       style={styles.markAsSoldButton}
-                      onPress={() => handleMarkAsSold(listing.id)}
+                      onPress={() => {
+                        console.log('Mark as sold pressed');
+                        handleMarkAsSold(listing.id);
+                      }}
+                      activeOpacity={0.7}
                     >
                       <Text style={styles.markAsSoldButtonText}>
                         Marquer vendu
@@ -276,7 +334,11 @@ export default function ProfileScreen() {
                   )}
                   <TouchableOpacity
                     style={styles.deleteButton}
-                    onPress={() => handleDeleteListing(listing.id)}
+                    onPress={() => {
+                      console.log('Delete button clicked!');
+                      handleDeleteListing(listing.id);
+                    }}
+                    activeOpacity={0.7}
                   >
                     <Text style={styles.deleteButtonText}>×</Text>
                   </TouchableOpacity>
@@ -287,11 +349,16 @@ export default function ProfileScreen() {
         )}
       </View>
     </ScrollView>
+    </View>
   </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#bedc39',
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -595,6 +662,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   emptyStateButton: {
+    backgroundColor: '#9bbd1f',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -606,6 +676,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+    textAlign: 'center',
   },
 
   // Listings grid
@@ -645,13 +716,21 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: '#fef2f2',
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#fecaca',
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   deleteButtonText: {
-    fontSize: 16,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#dc2626',
+    lineHeight: 24,
   },
 
   // Button styles

@@ -35,6 +35,29 @@ export default function HomeScreen() {
   useEffect(() => {
     loadCategories();
     loadListings();
+
+    // Set up real-time subscription for listings
+    const listingsSubscription = supabase
+      .channel('listings-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'listings',
+        },
+        (payload) => {
+          console.log('Real-time update:', payload);
+          // Reload listings when there's a change
+          loadListings();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(listingsSubscription);
+    };
   }, [selectedCategory]);
 
   const loadCategories = async () => {
@@ -95,64 +118,68 @@ export default function HomeScreen() {
   );
 
   const renderHeader = () => (
-    <View style={styles.header}>
-      <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-      <Text style={styles.subtitle}>Marketplace local de RDC</Text>
+    <>
+      <View style={styles.header}>
+        <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
+        <Text style={styles.subtitle}>Marketplace local de RDC</Text>
 
-      <View style={styles.searchContainer}>
-        <Search size={20} color="#64748b" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Rechercher des articles..."
-          placeholderTextColor="#94a3b8"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
+        <View style={styles.searchContainer}>
+          <Search size={20} color="#64748b" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Rechercher des articles..."
+            placeholderTextColor="#94a3b8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
 
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={[{ id: 'all', name: 'Tout' }, ...categories]}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.categoryChip,
-              (item.id === 'all' && !selectedCategory) ||
-              item.id === selectedCategory
-                ? styles.categoryChipActive
-                : null,
-            ]}
-            onPress={() =>
-              setSelectedCategory(item.id === 'all' ? null : item.id)
-            }
-          >
-            <Text
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={[{ id: 'all', name: 'Tout' }, ...categories]}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity
               style={[
-                styles.categoryChipText,
+                styles.categoryChip,
                 (item.id === 'all' && !selectedCategory) ||
                 item.id === selectedCategory
-                  ? styles.categoryChipTextActive
+                  ? styles.categoryChipActive
                   : null,
               ]}
+              onPress={() =>
+                setSelectedCategory(item.id === 'all' ? null : item.id)
+              }
             >
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        )}
-        contentContainerStyle={styles.categoriesContainer}
-        style={styles.categoriesList}
-      />
-    </View>
+              <Text
+                style={[
+                  styles.categoryChipText,
+                  (item.id === 'all' && !selectedCategory) ||
+                  item.id === selectedCategory
+                    ? styles.categoryChipTextActive
+                    : null,
+                ]}
+              >
+                {item.name}
+              </Text>
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={styles.categoriesContainer}
+          style={styles.categoriesList}
+        />
+      </View>
+      <View style={styles.listingsHeader} />
+    </>
   );
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.container}>
-        {renderHeader()}
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#9bbd1f" />
+        </View>
         </View>
       </SafeAreaView>
     );
@@ -174,9 +201,8 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {renderHeader()}
-      
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#9bbd1f" />
@@ -186,6 +212,7 @@ export default function HomeScreen() {
           data={filteredListings}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={renderHeader()}
           contentContainerStyle={styles.listingsContainer}
           numColumns={2}
           columnWrapperStyle={styles.row}
@@ -209,32 +236,37 @@ export default function HomeScreen() {
         />
       )}
       {/* Location modal disabled */}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#bedc39',
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
   },
   header: {
-    padding: 16,
     backgroundColor: '#bedc39',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   logoImage: {
     width: '100%',
     height: 56,
-    borderRadius: 12,
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   subtitle: {
     fontSize: 14,
     color: '#64748b',
     textAlign: 'center',
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -243,6 +275,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     marginBottom: 16,
+    marginHorizontal: 16,
   },
   searchIcon: {
     marginRight: 8,
@@ -254,10 +287,10 @@ const styles = StyleSheet.create({
     color: '#1e293b',
   },
   categoriesContainer: {
-    paddingHorizontal: 16,
+    paddingLeft: 16,
   },
   categoriesList: {
-    marginBottom: 8,
+    marginBottom: 0,
   },
   categoryChip: {
     paddingHorizontal: 16,
@@ -278,11 +311,14 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   listingsContainer: {
-    padding: 16,
     paddingBottom: 100,
+  },
+  listingsHeader: {
+    height: 16,
   },
   row: {
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
   },
   listingCardContainer: {
     width: '48%',

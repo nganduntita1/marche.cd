@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet, Platform } from 'react-native';
-import { Home, Plus, User } from 'lucide-react-native';
+import { Home, Plus, User, MessageCircle } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -24,15 +24,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="post"
+        name="messages"
         options={{
           title: '',
           tabBarIcon: ({ color, size }) => (
-            <View style={styles.addButton}>
-              <Plus color="#fff" size={32} strokeWidth={2.5} />
-            </View>
+            <MessageCircle color={color} size={size} strokeWidth={2} />
           ),
-          tabBarLabel: () => null,
         }}
       />
       <Tabs.Screen
@@ -42,6 +39,18 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <User color={color} size={size} strokeWidth={2} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="post"
+        options={{
+          title: '',
+          tabBarIcon: ({ color, size }) => (
+            <View style={styles.addButton}>
+              <Plus color="#fff" size={32} strokeWidth={2.5} />
+            </View>
+          ),
+          tabBarLabel: () => null,
         }}
       />
     </Tabs>

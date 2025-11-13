@@ -68,7 +68,7 @@ export default function PostScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: false,
       quality: 0.8,
     });
@@ -139,17 +139,24 @@ export default function PostScreen() {
             const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
             const fileName = `${user.id}/${Date.now()}-${idx}.${ext}`;
 
-            // Read file as base64
-            const base64 = await FileSystem.readAsStringAsync(uri, {
-              encoding: FileSystem.EncodingType.Base64,
-            });
+            let fileData;
 
-            // Convert base64 to array buffer
-            const arrayBuffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+            if (Platform.OS === 'web') {
+              // Web: Fetch as blob
+              const response = await fetch(uri);
+              fileData = await response.blob();
+            } else {
+              // Native: Use FileSystem
+              const base64 = await FileSystem.readAsStringAsync(uri, {
+                encoding: FileSystem.EncodingType.Base64,
+              });
+              // Convert base64 to array buffer
+              fileData = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+            }
 
             const { error: uploadError } = await supabase.storage
               .from('listings')
-              .upload(fileName, arrayBuffer, {
+              .upload(fileName, fileData, {
                 contentType: `image/${ext}`,
                 cacheControl: '3600',
                 upsert: false,
@@ -209,7 +216,8 @@ export default function PostScreen() {
   // -------------------------------------------------------------------------
   if (!user) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.container}>
         <ScrollView 
           style={styles.scrollView} 
           contentContainerStyle={styles.scrollContent}
@@ -230,13 +238,15 @@ export default function PostScreen() {
             </View>
           </View>
         </ScrollView>
+        </View>
       </SafeAreaView>
     );
   }
 
   if (!user.phone || !user.location) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.container}>
         <ScrollView 
           style={styles.scrollView} 
           contentContainerStyle={styles.scrollContent}
@@ -257,12 +267,14 @@ export default function PostScreen() {
             </View>
           </View>
         </ScrollView>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
       <ScrollView 
         style={styles.scrollView} 
         contentContainerStyle={styles.scrollContent}
@@ -474,11 +486,16 @@ export default function PostScreen() {
           router.push('/(tabs)/profile');
         }}
       />
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#bedc39',
+  },
   container: { 
     flex: 1, 
     backgroundColor: '#f8fafc' 

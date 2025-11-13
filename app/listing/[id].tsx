@@ -10,6 +10,7 @@ import {
   Linking,
   ActivityIndicator,
   Modal,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -180,7 +181,8 @@ export default function ListingDetailScreen() {
     : ['https://images.pexels.com/photos/4968391/pexels-photo-4968391.jpeg?auto=compress&cs=tinysrgb&w=800'];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.imageContainer}>
           <ScrollView
@@ -297,7 +299,11 @@ export default function ListingDetailScreen() {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Vendeur</Text>
-            <View style={styles.sellerInfo}>
+            <TouchableOpacity 
+              style={styles.sellerInfo}
+              onPress={() => router.push(`/user/${listing.seller_id}`)}
+              activeOpacity={0.7}
+            >
               <View style={styles.sellerAvatar}>
                 <Text style={styles.sellerInitial}>
                   {listing.seller.name?.[0]?.toUpperCase() || '?'}
@@ -312,7 +318,8 @@ export default function ListingDetailScreen() {
                   </Text>
                 </View>
               </View>
-            </View>
+              <Text style={styles.viewProfileText}>Voir profil →</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.separator} />
@@ -403,9 +410,49 @@ export default function ListingDetailScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
+        <TouchableOpacity style={styles.chatButton} onPress={async () => {
+          if (!user) {
+            Alert.alert('Connexion requise', 'Connectez-vous pour envoyer un message');
+            return;
+          }
+          
+          // Create or get conversation
+          try {
+            const { data: existingConv, error: fetchError } = await supabase
+              .from('conversations')
+              .select('id')
+              .eq('listing_id', listing.id)
+              .eq('buyer_id', user.id)
+              .single();
+
+            if (existingConv) {
+              router.push(`/chat/${existingConv.id}`);
+            } else {
+              const { data: newConv, error: createError } = await supabase
+                .from('conversations')
+                .insert({
+                  listing_id: listing.id,
+                  buyer_id: user.id,
+                  seller_id: listing.seller_id,
+                })
+                .select()
+                .single();
+
+              if (createError) throw createError;
+              router.push(`/chat/${newConv.id}`);
+            }
+          } catch (error) {
+            console.error('Error creating conversation:', error);
+            Alert.alert('Erreur', 'Impossible de démarrer la conversation');
+          }
+        }}>
+          <MessageCircle size={20} color="#fff" />
+          <Text style={styles.chatButtonText}>Message</Text>
+        </TouchableOpacity>
+        
         <TouchableOpacity style={styles.whatsappButton} onPress={openWhatsApp}>
           <MessageCircle size={20} color="#fff" />
-          <Text style={styles.whatsappButtonText}>Contacter sur WhatsApp</Text>
+          <Text style={styles.whatsappButtonText}>WhatsApp</Text>
         </TouchableOpacity>
       </View>
 
@@ -479,11 +526,16 @@ export default function ListingDetailScreen() {
           )}
         </View>
       </Modal>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#bedc39',
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -700,6 +752,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
   },
+  viewProfileText: {
+    fontSize: 14,
+    color: '#9bbd1f',
+    fontWeight: '600',
+  },
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -709,8 +766,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  chatButton: {
+    flex: 1,
+    backgroundColor: '#9bbd1f',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  chatButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   whatsappButton: {
+    flex: 1,
     backgroundColor: '#25D366',
     flexDirection: 'row',
     alignItems: 'center',
