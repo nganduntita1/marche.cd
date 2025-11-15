@@ -16,12 +16,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Send } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMessages } from '@/contexts/MessagesContext';
 import { Message, Conversation } from '@/types/chat';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { refreshUnreadCount } = useMessages();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -32,15 +34,51 @@ export default function ChatScreen() {
   const optimisticRef = useRef<Record<string, boolean>>({});
   // keep a reference to the active supabase channel so we can broadcast on it
   const channelRef = useRef<any>(null);
+  // track the last known message id to detect new messages via polling
+  const lastMessageIdRef = useRef<string | null>(null);
+  // polling interval to ensure messages are delivered even if Realtime fails
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (id && user) {
       loadConversation();
       loadMessages();
       const cleanup = subscribeToMessages();
-      return cleanup;
+      startPollingForNewMessages();
+      
+      // Mark messages as read when screen is focused
+      const markAsReadInterval = setInterval(() => {
+        markMessagesAsRead();
+      }, 2000); // Check every 2 seconds
+      
+      return () => {
+        cleanup();
+        stopPolling();
+        clearInterval(markAsReadInterval);
+      };
     }
   }, [id, user]);
+
+  const markMessagesAsRead = async () => {
+    if (!user || !id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('conversation_id', id)
+        .neq('sender_id', user.id)
+        .eq('is_read', false)
+        .select();
+      
+      if (!error && data && data.length > 0) {
+        console.log('[CHAT] Marked', data.length, 'messages as read');
+        refreshUnreadCount();
+      }
+    } catch (error) {
+      console.error('[CHAT] Error marking messages as read:', error);
+    }
+  };
 
   const loadConversation = async () => {
     try {
@@ -49,8 +87,8 @@ export default function ChatScreen() {
         .select(`
           *,
           listing:listings(id, title, images, price),
-          buyer:users!conversations_buyer_id_fkey(id, name, email),
-          seller:users!conversations_seller_id_fkey(id, name, email)
+          buyer:users!conversations_buyer_id_fkey(id, name, email, profile_picture),
+          seller:users!conversations_seller_id_fkey(id, name, email, profile_picture)
         `)
         .eq('id', id)
         .single();
@@ -73,25 +111,45 @@ export default function ChatScreen() {
 
       if (error) throw error;
       setMessages(data || []);
+      
+      // Track the last message id for polling
+      if (data && data.length > 0) {
+        lastMessageIdRef.current = data[data.length - 1].id;
+      }
 
       // Mark messages as read
       if (user) {
-        await supabase
+        const result = await supabase
           .from('messages')
           .update({ is_read: true })
           .eq('conversation_id', id)
           .neq('sender_id', user.id)
-          .eq('is_read', false);
+          .eq('is_read', false)
+          .select();
+        
+        // If we marked any messages as read, refresh unread counts
+        if (result.data && result.data.length > 0) {
+          console.log('[CHAT] Marked', result.data.length, 'messages as read');
+          // Refresh unread count globally
+          console.log('[CHAT] Messages marked as read, refreshing unread count');
+          refreshUnreadCount();
+        }
       }
     } catch (error) {
       console.error('Error loading messages:', error);
     } finally {
       setLoading(false);
+      // Scroll to bottom after loading is complete and UI has rendered
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 300);
     }
   };
 
   const subscribeToMessages = () => {
     const channel = supabase.channel(`messages-${id}`);
+    
+    console.log(`[CHAT] Subscribing to channel: messages-${id}`);
 
     // handle INSERT events
     channel.on(
@@ -103,6 +161,7 @@ export default function ChatScreen() {
         filter: `conversation_id=eq.${id}`,
       },
       (payload) => {
+        console.log('[CHAT] INSERT event received:', payload);
         const newMsg = payload.new as Message;
 
         setMessages((prev) => {
@@ -123,8 +182,12 @@ export default function ChatScreen() {
             .from('messages')
             .update({ is_read: true })
             .eq('id', newMsg.id)
-            // avoid relying on .catch() because of PromiseLike typing in this env
-            .then(() => {}, () => {});
+            .then(({ error }) => {
+              if (!error) {
+                console.log('[CHAT] New message marked as read');
+                refreshUnreadCount();
+              }
+            }, () => {});
         }
 
         // Scroll to bottom
@@ -139,14 +202,37 @@ export default function ChatScreen() {
       'broadcast',
       { event: 'new-message' },
       (payload) => {
-        // payload is the message object; cast safely via unknown
-        const newMsg = payload as unknown as Message;
-        if (!newMsg || newMsg.conversation_id !== id) return;
+        console.log('[CHAT] Broadcast event received:', payload);
+        // payload.payload contains the actual message
+        const newMsg = (payload.payload || payload) as unknown as Message;
+        if (!newMsg || !newMsg.conversation_id || newMsg.conversation_id !== id) {
+          console.log('[CHAT] Skipping broadcast: missing msg or wrong conversation', { newMsg, id });
+          return;
+        }
 
+        console.log('[CHAT] Adding broadcast message to state:', newMsg);
         setMessages((prev) => {
-          if (prev.some((m) => m.id === newMsg.id)) return prev;
+          if (prev.some((m) => m.id === newMsg.id)) {
+            console.log('[CHAT] Message already in state, skipping');
+            return prev;
+          }
+          console.log('[CHAT] Message added to state');
           return [...prev, newMsg];
         });
+
+        // Mark as read if not sent by current user
+        if (user && newMsg.sender_id !== user.id) {
+          supabase
+            .from('messages')
+            .update({ is_read: true })
+            .eq('id', newMsg.id)
+            .then(({ error }) => {
+              if (!error) {
+                console.log('[CHAT] Broadcast message marked as read');
+                refreshUnreadCount();
+              }
+            }, () => {});
+        }
 
         // scroll
         setTimeout(() => {
@@ -165,11 +251,13 @@ export default function ChatScreen() {
         filter: `conversation_id=eq.${id}`,
       },
       (payload) => {
+        console.log('[CHAT] UPDATE event received:', payload);
         const updated = payload.new as Message;
         setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
       }
     );
 
+  console.log('[CHAT] Calling channel.subscribe()');
   channel.subscribe();
   channelRef.current = channel;
 
@@ -188,6 +276,58 @@ export default function ChatScreen() {
     };
   };
 
+  const startPollingForNewMessages = () => {
+    // Poll every 2 seconds for new messages as a fallback to Realtime
+    console.log('[CHAT] Starting polling for new messages');
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        // Only fetch messages newer than what we already have
+        const query = supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', id as string)
+          .order('created_at', { ascending: true });
+
+        const { data, error } = await query;
+        if (error) {
+          console.log('[CHAT] Polling error:', error);
+          return;
+        }
+
+        if (!data || data.length === 0) return;
+
+        const lastMsg = data[data.length - 1];
+        if (lastMsg.id === lastMessageIdRef.current) return; // No new messages
+
+        console.log('[CHAT] Polling detected new messages');
+        lastMessageIdRef.current = lastMsg.id;
+
+        // Add any new messages we don't already have
+        setMessages((prev) => {
+          const newMsgs = data.filter((m) => !prev.some((existing) => existing.id === m.id));
+          if (newMsgs.length === 0) return prev;
+          console.log('[CHAT] Polling added', newMsgs.length, 'new messages');
+          return [...prev, ...newMsgs];
+        });
+
+        // Scroll to bottom
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      } catch (err) {
+        console.log('[CHAT] Polling exception:', err);
+      }
+    }, 2000);
+  };
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      console.log('[CHAT] Stopping polling');
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  };
+
   const sendMessage = async () => {
     if (!newMessage.trim() || !user || sending) return;
 
@@ -204,6 +344,7 @@ export default function ChatScreen() {
         created_at: new Date().toISOString(),
       };
 
+      console.log('[CHAT] Sending message (optimistic):', optimisticMessage);
       optimisticRef.current[tempId] = true;
       setMessages((prev) => [...prev, optimisticMessage]);
       setNewMessage('');
@@ -220,6 +361,8 @@ export default function ChatScreen() {
         .single();
 
       if (error) throw error;
+      
+      console.log('[CHAT] Message inserted to DB:', data);
 
       // replace temp message with server message (dedupe)
       if (data) {
@@ -231,16 +374,23 @@ export default function ChatScreen() {
         });
         if (optimisticRef.current[tempId]) delete optimisticRef.current[tempId];
         
-        // invoke edge function to broadcast to other clients (server-side broadcast)
-        try {
-          // supabase.functions.invoke requires a function deployed to Supabase Edge Functions
-          // We pass the created message id so the function can fetch and broadcast it using the service role
-          supabase.functions.invoke('broadcast-message', {
-            body: { messageId: (data as Message).id },
-          }).then(() => {}, () => {});
-        } catch (err) {
-          // non-fatal: broadcasting is best-effort
-          console.warn('broadcast invoke failed', err);
+        // Client-side broadcast: send the message to other connected clients on the same channel
+        // This ensures real-time delivery even if the server-side broadcast fails or isn't available
+        if (channelRef.current) {
+          try {
+            console.log('[CHAT] Sending client-side broadcast');
+            channelRef.current.send({
+              type: 'broadcast',
+              event: 'new-message',
+              payload: data as Message,
+            }).then(() => {
+              console.log('[CHAT] Client-side broadcast sent successfully');
+            }, (err: unknown) => {
+              console.log('[CHAT] Client-side broadcast error:', err);
+            });
+          } catch (err) {
+            console.warn('client broadcast failed', err);
+          }
         }
       }
     } catch (error) {
@@ -259,43 +409,95 @@ export default function ChatScreen() {
       : conversation.buyer;
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
+  const formatDateSeparator = (date: string) => {
+    const msgDate = new Date(date);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (msgDate.toDateString() === today.toDateString()) {
+      return 'Aujourd\'hui';
+    } else if (msgDate.toDateString() === yesterday.toDateString()) {
+      return 'Hier';
+    } else {
+      return msgDate.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+      });
+    }
+  };
+
+  const shouldShowDateSeparator = (currentMsg: Message, prevMsg: Message | null) => {
+    if (!prevMsg) return true;
+    
+    const currentDate = new Date(currentMsg.created_at).toDateString();
+    const prevDate = new Date(prevMsg.created_at).toDateString();
+    
+    return currentDate !== prevDate;
+  };
+
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const isMyMessage = item.sender_id === user?.id;
+    const prevMessage = index > 0 ? messages[index - 1] : null;
+    const showDateSeparator = shouldShowDateSeparator(item, prevMessage);
+    const showAvatar = !isMyMessage && (index === messages.length - 1 || messages[index + 1]?.sender_id !== item.sender_id);
     
     return (
-      <View
-        style={[
-          styles.messageContainer,
-          isMyMessage ? styles.myMessage : styles.otherMessage,
-        ]}
-      >
+      <>
+        {showDateSeparator && (
+          <View style={styles.dateSeparatorContainer}>
+            <Text style={styles.dateSeparatorText}>
+              {formatDateSeparator(item.created_at)}
+            </Text>
+          </View>
+        )}
         <View
           style={[
-            styles.messageBubble,
-            isMyMessage ? styles.myMessageBubble : styles.otherMessageBubble,
+            styles.messageContainer,
+            isMyMessage ? styles.myMessage : styles.otherMessage,
           ]}
         >
-          <Text
-            style={[
-              styles.messageText,
-              isMyMessage ? styles.myMessageText : styles.otherMessageText,
-            ]}
-          >
-            {item.content}
-          </Text>
-          <Text
-            style={[
-              styles.messageTime,
-              isMyMessage ? styles.myMessageTime : styles.otherMessageTime,
-            ]}
-          >
-            {new Date(item.created_at).toLocaleTimeString('fr-FR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </Text>
+          {!isMyMessage && showAvatar && (
+            otherUser?.profile_picture ? (
+              <Image 
+                source={{ uri: otherUser.profile_picture }} 
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarText}>
+                  {(otherUser?.name || 'U')[0].toUpperCase()}
+                </Text>
+              </View>
+            )
+          )}
+          {!isMyMessage && !showAvatar && <View style={styles.avatarSpacer} />}
+          
+          <View style={styles.messageWrapper}>
+            <View
+              style={[
+                styles.messageBubble,
+                isMyMessage ? styles.myMessageBubble : styles.otherMessageBubble,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.messageText,
+                  isMyMessage ? styles.myMessageText : styles.otherMessageText,
+                ]}
+              >
+                {item.content}
+              </Text>
+            </View>
+            <Text style={[styles.messageTime, isMyMessage ? styles.myMessageTimeAlign : styles.otherMessageTimeAlign]}>
+              {new Date(item.created_at).toLocaleTimeString('fr-FR', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
+          </View>
         </View>
-      </View>
+      </>
     );
   };
 
@@ -319,8 +521,9 @@ export default function ChatScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color="#1e293b" />
+          <ArrowLeft size={24} color="#1e293b" strokeWidth={2} />
         </TouchableOpacity>
+        
         <TouchableOpacity 
           style={styles.headerInfo}
           onPress={() => {
@@ -333,19 +536,57 @@ export default function ChatScreen() {
           }}
           activeOpacity={0.7}
         >
-          <Text style={styles.headerName}>{otherUser?.name || 'Utilisateur'}</Text>
-          {conversation?.listing && (
-            <Text style={styles.headerListing} numberOfLines={1}>
-              {conversation.listing.title}
-            </Text>
+          {otherUser?.profile_picture ? (
+            <Image 
+              source={{ uri: otherUser.profile_picture }} 
+              style={styles.headerAvatarImage}
+            />
+          ) : (
+            <View style={styles.headerAvatar}>
+              <Text style={styles.headerAvatarText}>
+                {(otherUser?.name || 'U')[0].toUpperCase()}
+              </Text>
+            </View>
           )}
-          <Text style={styles.viewProfileHint}>Appuyez pour voir le profil</Text>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerName}>{otherUser?.name || 'Utilisateur'}</Text>
+            {conversation?.listing && (
+              <Text style={styles.headerListing} numberOfLines={1}>
+                {conversation.listing.title}
+              </Text>
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 
+      {/* Listing Preview Card */}
+      {conversation?.listing && (
+        <TouchableOpacity
+          style={styles.listingPreview}
+          onPress={() => router.push(`/listing/${conversation.listing_id}`)}
+          activeOpacity={0.8}
+        >
+          <Image
+            source={{ uri: conversation.listing.images[0] }}
+            style={styles.listingPreviewImage}
+          />
+          <View style={styles.listingPreviewInfo}>
+            <Text style={styles.listingPreviewTitle} numberOfLines={2}>
+              {conversation.listing.title}
+            </Text>
+            <Text style={styles.listingPreviewPrice}>
+              ${conversation.listing.price.toLocaleString()}
+            </Text>
+          </View>
+          <View style={styles.listingPreviewArrow}>
+            <Text style={styles.listingPreviewArrowText}>›</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
       <KeyboardAvoidingView
         style={styles.chatContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <FlatList
@@ -354,27 +595,39 @@ export default function ChatScreen() {
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messagesList}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => {
+            if (messages.length > 0) {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
+          onLayout={() => {
+            if (messages.length > 0) {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
         />
 
         <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Écrivez votre message..."
-            placeholderTextColor="#94a3b8"
-            value={newMessage}
-            onChangeText={setNewMessage}
-            multiline
-            maxLength={1000}
-          />
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.input}
+              placeholder="Écrire un message"
+              placeholderTextColor="#8e8e93"
+              value={newMessage}
+              onChangeText={setNewMessage}
+              multiline
+              maxLength={1000}
+            />
+          </View>
+          
           <TouchableOpacity
             style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
             onPress={sendMessage}
             disabled={!newMessage.trim() || sending}
           >
-            <Send size={20} color={newMessage.trim() ? '#fff' : '#94a3b8'} />
+            <Send size={20} color="#fff" fill="#fff" strokeWidth={2} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -386,123 +639,250 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#bedc39',
+    backgroundColor: '#fff',
   },
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#e5e5ea',
   },
   backButton: {
     marginRight: 12,
+    padding: 4,
   },
   headerInfo: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#9bbd1f',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  headerAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  headerAvatarText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   headerName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#000',
   },
   headerListing: {
-    fontSize: 14,
-    color: '#64748b',
+    fontSize: 13,
+    color: '#8e8e93',
     marginTop: 2,
   },
-  viewProfileHint: {
-    fontSize: 12,
-    color: '#9bbd1f',
-    marginTop: 2,
+  listingPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(229, 229, 234, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  listingPreviewImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#f2f2f7',
+  },
+  listingPreviewInfo: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  listingPreviewTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  listingPreviewPrice: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#22c55e',
+  },
+  listingPreviewArrow: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listingPreviewArrowText: {
+    fontSize: 28,
+    fontWeight: '300',
+    color: '#8e8e93',
   },
   chatContainer: {
     flex: 1,
   },
   messagesList: {
-    padding: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  dateSeparatorContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dateSeparatorText: {
+    fontSize: 13,
+    color: '#8e8e93',
+    fontWeight: '500',
   },
   messageContainer: {
-    marginBottom: 12,
-    maxWidth: '80%',
+    marginBottom: 8,
+    maxWidth: '75%',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   myMessage: {
     alignSelf: 'flex-end',
+    marginLeft: 'auto',
   },
   otherMessage: {
     alignSelf: 'flex-start',
   },
-  messageBubble: {
+  avatarPlaceholder: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    padding: 12,
+    backgroundColor: '#9bbd1f',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  avatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  avatarText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  avatarSpacer: {
+    width: 40,
+  },
+  messageWrapper: {
+    alignItems: 'flex-start',
+  },
+  messageBubble: {
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    alignSelf: 'flex-start',
   },
   myMessageBubble: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: '#22c55e',
+    borderBottomRightRadius: 4,
   },
   otherMessageBubble: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    backgroundColor: '#E9E9EB',
+    borderBottomLeftRadius: 4,
   },
   messageText: {
     fontSize: 16,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   myMessageText: {
     color: '#fff',
   },
   otherMessageText: {
-    color: '#1e293b',
+    color: '#000',
   },
   messageTime: {
     fontSize: 11,
+    color: '#8e8e93',
     marginTop: 4,
   },
-  myMessageTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
+  myMessageTimeAlign: {
+    textAlign: 'right',
   },
-  otherMessageTime: {
-    color: '#94a3b8',
+  otherMessageTimeAlign: {
+    textAlign: 'left',
+    marginLeft: 8,
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 16,
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingBottom: 8,
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: '#e5e5ea',
+    gap: 10,
   },
-  input: {
+  inputWrapper: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f2f2f7',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 8,
-    fontSize: 16,
+    paddingVertical: 8,
+    minHeight: 38,
     maxHeight: 100,
-    color: '#1e293b',
+    justifyContent: 'center',
+  },
+  input: {
+    fontSize: 16,
+    color: '#000',
+    padding: 0,
+    margin: 0,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#9bbd1f',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#22c55e',
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#22c55e',
+    opacity: 0.5,
   },
 });

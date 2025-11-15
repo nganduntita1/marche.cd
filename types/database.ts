@@ -4,6 +4,7 @@ export interface User {
   phone: string;
   email?: string;
   location?: string;
+  profile_picture?: string;
   is_verified: boolean;
   credits: number;
   total_spent: number;

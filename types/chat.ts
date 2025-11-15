@@ -17,11 +17,13 @@ export type Conversation = {
     id: string;
     name: string;
     email: string;
+    profile_picture?: string;
   };
   seller?: {
     id: string;
     name: string;
     email: string;
+    profile_picture?: string;
   };
 };
 

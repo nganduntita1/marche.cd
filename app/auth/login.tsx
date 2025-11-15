@@ -11,7 +11,9 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { Mail, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginScreen() {
@@ -19,6 +21,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { signIn } = useAuth();
   const router = useRouter();
 
@@ -42,20 +45,33 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
-            <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-            <Text style={styles.tagline}>Achetez et vendez localement</Text>
-          </View>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <LinearGradient
+            colors={['#9bbd1f', '#bedc39']}
+            style={styles.gradientHeader}
+          >
+            <Image 
+              source={require('@/assets/images/logo.png')} 
+              style={styles.logo} 
+              resizeMode="contain" 
+            />
+            <View style={styles.welcomeContainer}>
+              <Text style={styles.welcomeText}>Bienvenue sur</Text>
+            </View>
+            <Text style={styles.subtitle}>
+              Votre marketplace local pour acheter et vendre au Congo
+            </Text>
+          </LinearGradient>
 
           <View style={styles.form}>
-            <Text style={styles.title}>Connexion</Text>
-
             {error ? (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
@@ -63,26 +79,45 @@ export default function LoginScreen() {
             ) : null}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="votre@email.com"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+              <Text style={styles.label}>Adresse Email</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="votre@email.com"
+                  placeholderTextColor="#94a3b8"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+                <View style={styles.inputIcon}>
+                  <Mail size={20} color="#64748b" />
+                </View>
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Mot de passe</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Entrez votre mot de passe"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor="#94a3b8"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity 
+                  style={styles.inputIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff size={20} color="#64748b" />
+                  ) : (
+                    <Eye size={20} color="#64748b" />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
 
             <TouchableOpacity
@@ -100,111 +135,128 @@ export default function LoginScreen() {
               onPress={() => router.push('/auth/register')}
             >
               <Text style={styles.linkText}>
-                Pas de compte? <Text style={styles.linkBold}>Créer un compte</Text>
+                Pas de compte ? <Text style={styles.linkBold}>Créer un compte</Text>
               </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
-    );
-  };
+  );
+}
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: '#bedc39',
-    },
-    scrollContent: {
-      flexGrow: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 16,
-    },
-    header: {
-      alignItems: 'center',
-      marginBottom: 48,
-      width: '100%',
-      paddingHorizontal: 16,
-    },
-    logoImage: {
-      width: '100%',
-      height: 64,
-      borderRadius: 12,
-      marginBottom: 8,
-    },
-    tagline: {
-      fontSize: 16,
-      color: '#64748b',
-    },
-    form: {
-      width: '100%',
-      maxWidth: 420,
-      backgroundColor: '#fff',
-      borderRadius: 12,
-      padding: 16,
-      marginHorizontal: 16,
-    },
-    title: {
-      fontSize: 24,
-      fontWeight: '600',
-      marginBottom: 16,
-      color: '#0f172a',
-    },
-    inputGroup: {
-      marginBottom: 16,
-    },
-    label: {
-      fontSize: 14,
-      fontWeight: '500',
-      marginBottom: 8,
-      color: '#334155',
-    },
-    input: {
-      borderWidth: 1,
-      borderColor: '#e2e8f0',
-      borderRadius: 8,
-      padding: 8,
-      fontSize: 16,
-      backgroundColor: '#fff',
-    },
-    button: {
-      backgroundColor: '#9bbd1f',
-      padding: 16,
-      borderRadius: 8,
-      alignItems: 'center',
-      marginTop: 8,
-    },
-    buttonDisabled: {
-      opacity: 0.6,
-    },
-    buttonText: {
-      color: '#fff',
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    linkButton: {
-      marginTop: 16,
-      alignItems: 'center',
-    },
-    linkText: {
-      fontSize: 14,
-      color: '#64748b',
-    },
-    linkBold: {
-      color: '#9bbd1f',
-      fontWeight: '600',
-    },
-    errorContainer: {
-      backgroundColor: '#fef2f2',
-      padding: 8,
-      borderRadius: 8,
-      marginBottom: 16,
-      borderLeftWidth: 4,
-      borderLeftColor: '#dc2626',
-    },
-    errorText: {
-      color: '#dc2626',
-      fontSize: 14,
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  gradientHeader: {
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 48,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
+  logo: {
+    width: 180,
+    height: 56,
+    marginBottom: 32,
+  },
+  welcomeContainer: {
+    marginBottom: 16,
+  },
+  welcomeText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 12,
+    opacity: 0.95,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#fff',
+    lineHeight: 22,
+    opacity: 0.9,
+  },
+  form: {
+    padding: 24,
+    paddingTop: 32,
+  },
+  inputGroup: {
+    marginBottom: 24,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#1e293b',
+  },
+  inputContainer: {
+    position: 'relative',
+  },
+  input: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    paddingRight: 56,
+    fontSize: 16,
+    color: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  inputIcon: {
+    position: 'absolute',
+    right: 20,
+    top: '50%',
+    transform: [{ translateY: -10 }],
+  },
+  button: {
+    backgroundColor: '#9bbd1f',
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    shadowColor: '#9bbd1f',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  linkButton: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  linkText: {
+    fontSize: 15,
+    color: '#64748b',
+  },
+  linkBold: {
+    color: '#9bbd1f',
+    fontWeight: '700',
+  },
+  errorContainer: {
+    backgroundColor: '#fef2f2',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ef4444',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+});

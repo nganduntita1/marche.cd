@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, MapPin, MessageCircle, Calendar, Tag, ChevronLeft, ChevronRight, X } from 'lucide-react-native';
+import { ArrowLeft, MapPin, MessageCircle, Calendar, Tag, ChevronLeft, ChevronRight, X, Heart, Star, ThumbsUp } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ListingWithDetails } from '@/types/database';
 
@@ -32,13 +32,75 @@ export default function ListingDetailScreen() {
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageIndex, setModalImageIndex] = useState(0);
   const [showSafetyGuide, setShowSafetyGuide] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (id) {
       loadListing();
+      checkFavoriteStatus();
     }
   }, [id]);
+
+  const checkFavoriteStatus = async () => {
+    try {
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('listing_id', id)
+        .maybeSingle();
+
+      if (!error && data) {
+        setIsFavorite(true);
+      }
+    } catch (error) {
+      console.error('Error checking favorite:', error);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    try {
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
+
+      setFavoriteLoading(true);
+
+      if (isFavorite) {
+        // Remove from favorites
+        const { error } = await supabase
+          .from('favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('listing_id', id);
+
+        if (!error) {
+          setIsFavorite(false);
+        }
+      } else {
+        // Add to favorites
+        const { error } = await supabase
+          .from('favorites')
+          .insert({
+            user_id: user.id,
+            listing_id: id,
+          });
+
+        if (!error) {
+          setIsFavorite(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
 
   const loadListing = async () => {
     try {
@@ -251,22 +313,86 @@ export default function ListingDetailScreen() {
         </View>
 
         <View style={styles.content}>
+          {/* Breadcrumb */}
+          {listing.category && (
+            <View style={styles.breadcrumb}>
+              <Text style={styles.breadcrumbText}>Électronique</Text>
+              <Text style={styles.breadcrumbSeparator}>/</Text>
+              <Text style={styles.breadcrumbText}>Audio et Vidéo</Text>
+              <Text style={styles.breadcrumbSeparator}>/</Text>
+              <Text style={[styles.breadcrumbText, styles.breadcrumbActive]}>
+                {listing.category.name}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.header}>
             <Text style={styles.title}>{listing.title}</Text>
-            <Text style={styles.price}>${listing.price}</Text>
+            {user?.id === listing.seller_id ? (
+              // Owner: Show mark as sold button
+              listing.status === 'active' && (
+                <TouchableOpacity
+                  style={styles.headerMarkSoldButton}
+                  onPress={async () => {
+                    Alert.alert(
+                      'Marquer comme vendu',
+                      'Voulez-vous marquer cette annonce comme vendue ?',
+                      [
+                        { text: 'Annuler', style: 'cancel' },
+                        {
+                          text: 'Marquer vendu',
+                          onPress: async () => {
+                            try {
+                              const { error } = await supabase
+                                .from('listings')
+                                .update({ status: 'sold' })
+                                .eq('id', listing.id);
+
+                              if (error) throw error;
+                              Alert.alert('Succès', 'Annonce marquée comme vendue');
+                              loadListing();
+                            } catch (error) {
+                              console.error('Error marking as sold:', error);
+                              Alert.alert('Erreur', 'Impossible de mettre à jour l\'annonce');
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={styles.headerMarkSoldButtonText}>Marquer vendu</Text>
+                </TouchableOpacity>
+              )
+            ) : (
+              // Buyer: Show favorite button
+              <TouchableOpacity
+                style={styles.headerFavoriteButton}
+                onPress={toggleFavorite}
+                disabled={favoriteLoading}
+              >
+                <Heart
+                  size={28}
+                  color={isFavorite ? '#ef4444' : '#1e293b'}
+                  fill={isFavorite ? '#ef4444' : 'transparent'}
+                  strokeWidth={2}
+                />
+              </TouchableOpacity>
+            )}
           </View>
 
-          <View style={styles.metaInfo}>
-            <View style={styles.metaItem}>
-              <MapPin size={16} color="#64748b" />
-              <Text style={styles.metaText}>{listing.location}</Text>
+          {/* Rating and Recommendation */}
+          <View style={styles.ratingSection}>
+            <View style={styles.ratingItem}>
+              <Star size={18} color="#f59e0b" fill="#f59e0b" />
+              <Text style={styles.ratingText}>4.6</Text>
+              <Text style={styles.reviewsText}>120 Avis</Text>
             </View>
-            {listing.category && (
-              <View style={styles.metaItem}>
-                <Tag size={16} color="#64748b" />
-                <Text style={styles.metaText}>{listing.category.name}</Text>
-              </View>
-            )}
+            <View style={styles.ratingItem}>
+              <ThumbsUp size={18} color="#9bbd1f" />
+              <Text style={styles.recommendText}>86%</Text>
+              <Text style={styles.recommendSubtext}>(102) recommandent</Text>
+            </View>
           </View>
 
           <View style={styles.separator} />
@@ -299,27 +425,59 @@ export default function ListingDetailScreen() {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Vendeur</Text>
-            <TouchableOpacity 
-              style={styles.sellerInfo}
-              onPress={() => router.push(`/user/${listing.seller_id}`)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.sellerAvatar}>
-                <Text style={styles.sellerInitial}>
-                  {listing.seller.name?.[0]?.toUpperCase() || '?'}
-                </Text>
-              </View>
-              <View style={styles.sellerDetails}>
-                <Text style={styles.sellerName}>{listing.seller.name || 'Utilisateur'}</Text>
-                <View style={styles.sellerLocation}>
-                  <MapPin size={14} color="#64748b" />
-                  <Text style={styles.sellerLocationText}>
-                    {listing.seller.location || listing.location}
-                  </Text>
+            <View style={styles.sellerCard}>
+              <TouchableOpacity 
+                style={styles.sellerInfo}
+                onPress={() => router.push(`/user/${listing.seller_id}`)}
+                activeOpacity={0.7}
+              >
+                {listing.seller.profile_picture ? (
+                  <Image 
+                    source={{ uri: listing.seller.profile_picture }} 
+                    style={styles.sellerAvatarImage}
+                  />
+                ) : (
+                  <View style={styles.sellerAvatar}>
+                    <Text style={styles.sellerInitial}>
+                      {listing.seller.name?.[0]?.toUpperCase() || '?'}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.sellerDetails}>
+                  <View style={styles.sellerNameRow}>
+                    <Text style={styles.sellerName}>{listing.seller.name || 'Utilisateur'}</Text>
+                    {/* Mock verified badge - will be real data later */}
+                    {Math.random() > 0.4 && (
+                      <View style={styles.verifiedBadge}>
+                        <Text style={styles.verifiedText}>✓</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.sellerLocation}>
+                    <MapPin size={14} color="#64748b" />
+                    <Text style={styles.sellerLocationText}>
+                      {listing.seller.location || listing.location}
+                    </Text>
+                  </View>
+                  <View style={styles.sellerStats}>
+                    <View style={styles.sellerStat}>
+                      <Text style={styles.sellerStatValue}>4.8</Text>
+                      <Star size={12} color="#f59e0b" fill="#f59e0b" />
+                    </View>
+                    <View style={styles.sellerStatDivider} />
+                    <View style={styles.sellerStat}>
+                      <Text style={styles.sellerStatLabel}>24 ventes</Text>
+                    </View>
+                  </View>
                 </View>
-              </View>
-              <Text style={styles.viewProfileText}>Voir profil →</Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.viewProfileButton}
+                onPress={() => router.push(`/user/${listing.seller_id}`)}
+              >
+                <Text style={styles.viewProfileButtonText}>Voir profil</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.separator} />
@@ -409,52 +567,69 @@ export default function ListingDetailScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.chatButton} onPress={async () => {
-          if (!user) {
-            Alert.alert('Connexion requise', 'Connectez-vous pour envoyer un message');
-            return;
-          }
+      {user?.id === listing.seller_id ? (
+        // Owner actions
+        <View style={styles.footer}>
+          <View style={styles.priceSection}>
+            <Text style={styles.footerPrice}>${listing.price.toLocaleString()}</Text>
+            <Text style={styles.deliveryText}>Votre annonce</Text>
+          </View>
           
-          // Create or get conversation
-          try {
-            const { data: existingConv, error: fetchError } = await supabase
-              .from('conversations')
-              .select('id')
-              .eq('listing_id', listing.id)
-              .eq('buyer_id', user.id)
-              .single();
-
-            if (existingConv) {
-              router.push(`/chat/${existingConv.id}`);
-            } else {
-              const { data: newConv, error: createError } = await supabase
+          <TouchableOpacity 
+            style={styles.editButtonFooter} 
+            onPress={() => router.push(`/edit-listing/${id}`)}
+          >
+            <Text style={styles.editButtonText}>Modifier l'annonce</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        // Buyer actions
+        <View style={styles.footer}>
+          <View style={styles.priceSection}>
+            <Text style={styles.footerPrice}>${listing.price.toLocaleString()}</Text>
+            <Text style={styles.deliveryText}>Livraison disponible</Text>
+          </View>
+          
+          <TouchableOpacity style={styles.messageButton} onPress={async () => {
+            if (!user) {
+              Alert.alert('Connexion requise', 'Connectez-vous pour envoyer un message');
+              return;
+            }
+            
+            // Create or get conversation
+            try {
+              const { data: existingConv, error: fetchError } = await supabase
                 .from('conversations')
-                .insert({
-                  listing_id: listing.id,
-                  buyer_id: user.id,
-                  seller_id: listing.seller_id,
-                })
-                .select()
+                .select('id')
+                .eq('listing_id', listing.id)
+                .eq('buyer_id', user.id)
                 .single();
 
-              if (createError) throw createError;
-              router.push(`/chat/${newConv.id}`);
+              if (existingConv) {
+                router.push(`/chat/${existingConv.id}`);
+              } else {
+                const { data: newConv, error: createError } = await supabase
+                  .from('conversations')
+                  .insert({
+                    listing_id: listing.id,
+                    buyer_id: user.id,
+                    seller_id: listing.seller_id,
+                  })
+                  .select()
+                  .single();
+
+                if (createError) throw createError;
+                router.push(`/chat/${newConv.id}`);
+              }
+            } catch (error) {
+              console.error('Error creating conversation:', error);
+              Alert.alert('Erreur', 'Impossible de démarrer la conversation');
             }
-          } catch (error) {
-            console.error('Error creating conversation:', error);
-            Alert.alert('Erreur', 'Impossible de démarrer la conversation');
-          }
-        }}>
-          <MessageCircle size={20} color="#fff" />
-          <Text style={styles.chatButtonText}>Message</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.whatsappButton} onPress={openWhatsApp}>
-          <MessageCircle size={20} color="#fff" />
-          <Text style={styles.whatsappButtonText}>WhatsApp</Text>
-        </TouchableOpacity>
-      </View>
+          }}>
+            <MessageCircle size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Image Modal */}
       <Modal
@@ -599,6 +774,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  favoriteButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   navButtonLeft: {
     position: 'absolute',
     left: 16,
@@ -650,36 +836,88 @@ const styles = StyleSheet.create({
     backgroundColor: '#e2e8f0',
     marginVertical: 16,
   },
+  breadcrumb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  breadcrumbText: {
+    fontSize: 13,
+    color: '#9bbd1f',
+    fontWeight: '500',
+  },
+  breadcrumbSeparator: {
+    fontSize: 13,
+    color: '#cbd5e1',
+    marginHorizontal: 6,
+  },
+  breadcrumbActive: {
+    color: '#9bbd1f',
+    fontWeight: '600',
+  },
   header: {
-    marginBottom: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
   title: {
-    fontSize: 24,
+    flex: 1,
+    fontSize: 26,
     fontWeight: '700',
     color: '#1e293b',
-    marginBottom: 8,
-    lineHeight: 30,
+    lineHeight: 32,
+    marginRight: 12,
   },
-  price: {
-    fontSize: 28,
+  headerFavoriteButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerMarkSoldButton: {
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#86efac',
+  },
+  headerMarkSoldButtonText: {
+    fontSize: 14,
     fontWeight: '700',
+    color: '#16a34a',
+  },
+  ratingSection: {
+    marginBottom: 20,
+  },
+  ratingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  ratingText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginLeft: 6,
+    marginRight: 8,
+  },
+  reviewsText: {
+    fontSize: 14,
     color: '#9bbd1f',
   },
-  metaInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+  recommendText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginLeft: 6,
+    marginRight: 8,
   },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaText: {
+  recommendSubtext: {
     fontSize: 14,
     color: '#64748b',
   },
@@ -713,92 +951,119 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     fontWeight: '500',
   },
+  sellerCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
   sellerInfo: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#f8fafc',
-    padding: 16,
-    borderRadius: 12,
+    alignItems: 'flex-start',
+    gap: 16,
+    marginBottom: 16,
   },
   sellerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#9bbd1f',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  sellerAvatarImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
   sellerInitial: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
     color: '#fff',
   },
   sellerDetails: {
     flex: 1,
   },
+  sellerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
   sellerName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#1e293b',
-    marginBottom: 4,
+  },
+  verifiedBadge: {
+    backgroundColor: '#22c55e',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  verifiedText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
   },
   sellerLocation: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    marginBottom: 12,
   },
   sellerLocationText: {
     fontSize: 14,
     color: '#64748b',
   },
-  viewProfileText: {
-    fontSize: 14,
-    color: '#9bbd1f',
-    fontWeight: '600',
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+  sellerStats: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
-  chatButton: {
-    flex: 1,
-    backgroundColor: '#9bbd1f',
+  sellerStat: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
+    gap: 4,
   },
-  chatButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  sellerStatValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  sellerStatLabel: {
+    fontSize: 14,
     fontWeight: '600',
+    color: '#64748b',
   },
-  whatsappButton: {
-    flex: 1,
-    backgroundColor: '#25D366',
-    flexDirection: 'row',
+  sellerStatDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: '#e2e8f0',
+  },
+  viewProfileButton: {
+    backgroundColor: '#f8fafc',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  whatsappButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  viewProfileButtonText: {
+    fontSize: 15,
     fontWeight: '600',
+    color: '#1e293b',
   },
+
 
   // Modal styles
   modalContainer: {
@@ -970,5 +1235,60 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#166534',
     lineHeight: 18,
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    paddingBottom: 32,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  priceSection: {
+    flexShrink: 0,
+  },
+  footerPrice: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  deliveryText: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  messageButton: {
+    flex: 1,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#9bbd1f',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#9bbd1f',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  editButtonFooter: {
+    flex: 1,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#9bbd1f',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#9bbd1f',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  editButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

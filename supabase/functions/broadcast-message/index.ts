@@ -5,12 +5,11 @@
 // Supabase Edge and has access to Deno.env and std library.
 /* @ts-nocheck */
 
-import { serve } from 'std/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'jsr:@supabase/supabase-js';
 
 // Deno.env is available at runtime in Supabase Edge. Keep these env var names
 // matching your Supabase project (set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY).
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || Deno.env.get('NEXT_PUBLIC_SUPABASE_URL');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
@@ -21,24 +20,26 @@ const serverClient = createClient(SUPABASE_URL ?? '', SERVICE_ROLE_KEY ?? '', {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-serve(async (req: Request) => {
+// Handle HTTP requests
+Deno.serve(async (req: Request) => {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+  };
   try {
     // Basic CORS handling for browser preflight
     if (req.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
-        },
+        headers: corsHeaders,
       });
     }
     const body = await req.json().catch(() => ({}));
     const messageId = body?.messageId;
 
     if (!messageId) {
-      return new Response(JSON.stringify({ error: 'messageId is required' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'messageId is required' }), { status: 400, headers: corsHeaders });
     }
 
     // Fetch the message row
@@ -49,7 +50,7 @@ serve(async (req: Request) => {
       .single();
 
     if (fetchError || !message) {
-      return new Response(JSON.stringify({ error: fetchError?.message || 'Message not found' }), { status: 500 });
+      return new Response(JSON.stringify({ error: fetchError?.message || 'Message not found' }), { status: 500, headers: corsHeaders });
     }
 
     // Compose the channel name used by clients
@@ -75,9 +76,9 @@ serve(async (req: Request) => {
     });
 
     // success
-    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
   } catch (err: any) {
     console.error('broadcast-message error', err);
-    return new Response(JSON.stringify({ error: err?.message || String(err) }), { status: 500 });
+    return new Response(JSON.stringify({ error: err?.message || String(err) }), { status: 500, headers: corsHeaders });
   }
 });

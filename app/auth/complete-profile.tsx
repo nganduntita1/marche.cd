@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { Phone, MapPin } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -62,154 +63,128 @@ export default function CompleteProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={['#bedc39', '#9bbd1f']}
-          style={styles.header}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
         >
-          <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-          <Text style={styles.tagline}>Complétez votre profil</Text>
-        </LinearGradient>
-
-        <View style={styles.formCard}>
-          <View style={styles.iconContainer}>
-            <Text style={styles.iconText}>✨</Text>
-          </View>
-          
-          <Text style={styles.title}>Informations supplémentaires</Text>
-          <Text style={styles.subtitle}>
-            Ces informations sont nécessaires pour poster des annonces
-          </Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>📱 Numéro WhatsApp</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="+243..."
-                value={whatsapp}
-                onChangeText={setWhatsapp}
-                keyboardType="phone-pad"
-                placeholderTextColor="#94a3b8"
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>📍 Ville</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Kinshasa, Lubumbashi, etc."
-                value={location}
-                onChangeText={setLocation}
-                placeholderTextColor="#94a3b8"
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleComplete}
-            disabled={loading}
+          <LinearGradient
+            colors={['#9bbd1f', '#bedc39']}
+            style={styles.gradientHeader}
           >
-            <LinearGradient
-              colors={loading ? ['#94a3b8', '#64748b'] : ['#9bbd1f', '#7da01a']}
-              style={styles.buttonGradient}
+            <Image 
+              source={require('@/assets/images/logo.png')} 
+              style={styles.logo} 
+              resizeMode="contain" 
+            />
+            <View style={styles.welcomeContainer}>
+              <Text style={styles.welcomeText}>Complétez votre profil</Text>
+            </View>
+            <Text style={styles.subtitle}>
+              Ajoutez vos informations pour commencer à vendre sur Marche.cd
+            </Text>
+          </LinearGradient>
+
+          <View style={styles.form}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Numéro WhatsApp</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="+243..."
+                  placeholderTextColor="#94a3b8"
+                  value={whatsapp}
+                  onChangeText={setWhatsapp}
+                  keyboardType="phone-pad"
+                />
+                <View style={styles.inputIcon}>
+                  <Phone size={20} color="#64748b" />
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Ville</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Kinshasa, Lubumbashi, etc."
+                  placeholderTextColor="#94a3b8"
+                  value={location}
+                  onChangeText={setLocation}
+                />
+                <View style={styles.inputIcon}>
+                  <MapPin size={20} color="#64748b" />
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleComplete}
+              disabled={loading}
             >
               <Text style={styles.buttonText}>
-                {loading ? '⏳ Enregistrement...' : '🚀 Compléter mon profil'}
+                {loading ? 'Enregistrement...' : 'Compléter mon profil'}
               </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={() => router.replace('/(tabs)')}
-          >
-            <Text style={styles.skipText}>⏭️ Compléter plus tard</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  </SafeAreaView>
+            <TouchableOpacity
+              style={styles.skipButton}
+              onPress={() => router.replace('/(tabs)')}
+            >
+              <Text style={styles.skipText}>Passer pour l'instant</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fff',
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
   },
-  header: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
-    marginBottom: 24,
-    borderRadius: 20,
-    marginHorizontal: 4,
+  gradientHeader: {
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 48,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
-  logoImage: {
-    width: '100%',
-    height: 64,
-    borderRadius: 12,
+  logo: {
+    width: 180,
+    height: 56,
+    marginBottom: 32,
+  },
+  welcomeContainer: {
     marginBottom: 16,
   },
-  tagline: {
+  welcomeText: {
     fontSize: 20,
-    color: '#fff',
     fontWeight: '600',
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  formCard: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
-    marginHorizontal: 4,
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: 24,
-  },
-  iconText: {
-    fontSize: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
+    color: '#fff',
     marginBottom: 12,
-    color: '#1e293b',
-    textAlign: 'center',
+    opacity: 0.95,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#64748b',
-    marginBottom: 32,
-    textAlign: 'center',
-    lineHeight: 24,
+    fontSize: 15,
+    color: '#fff',
+    lineHeight: 22,
+    opacity: 0.9,
+  },
+  form: {
+    padding: 24,
+    paddingTop: 32,
   },
   inputGroup: {
     marginBottom: 24,
@@ -221,44 +196,43 @@ const styles = StyleSheet.create({
     color: '#1e293b',
   },
   inputContainer: {
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    position: 'relative',
   },
   input: {
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    paddingVertical: 18,
     paddingHorizontal: 20,
+    paddingRight: 56,
     fontSize: 16,
-    backgroundColor: '#fff',
     color: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  inputIcon: {
+    position: 'absolute',
+    right: 20,
+    top: '50%',
+    transform: [{ translateY: -10 }],
   },
   button: {
+    backgroundColor: '#9bbd1f',
+    paddingVertical: 18,
     borderRadius: 16,
-    marginTop: 16,
-    shadowColor: '#000',
+    alignItems: 'center',
+    marginTop: 8,
+    shadowColor: '#9bbd1f',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 4,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
-  buttonGradient: {
-    paddingVertical: 18,
-    paddingHorizontal: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
   buttonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
   },
   skipButton: {
@@ -267,7 +241,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   skipText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#64748b',
     fontWeight: '500',
   },

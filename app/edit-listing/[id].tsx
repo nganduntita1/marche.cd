@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,22 +9,23 @@ import {
   Image,
   Alert,
   Modal,
-  FlatList,
+  ActivityIndicator,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '@/lib/supabase';
-import Popup from '@/components/Popup';
-import { Bell, Camera, FileText, Tag, DollarSign, X, Check } from 'lucide-react-native';
+import { ArrowLeft, Camera, FileText, Tag, DollarSign, X, Check } from 'lucide-react-native';
 
-export default function PostScreen() {
+export default function EditListingScreen() {
+  const { id } = useLocalSearchParams();
   const { user } = useAuth();
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -32,19 +33,6 @@ export default function PostScreen() {
   const [images, setImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
-  const [showNoCreditsPopup, setShowNoCreditsPopup] = useState(false);
-  const [newListingId, setNewListingId] = useState<string | null>(null);
-  const [customCategory, setCustomCategory] = useState('');
-
-  const resetForm = () => {
-    setTitle('');
-    setCategory('');
-    setDescription('');
-    setPrice('');
-    setImages([]);
-    setNewListingId(null);
-  };
 
   const categories = [
     { label: 'Téléphones', value: 'telephones' },
@@ -57,6 +45,45 @@ export default function PostScreen() {
     { label: 'Immobilier', value: 'immobilier' },
     { label: 'Autre', value: 'autre' },
   ];
+
+  useEffect(() => {
+    loadListing();
+  }, [id]);
+
+  const loadListing = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('listings')
+        .select(`
+          *,
+          category:category_id(slug)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+
+      // Check if user owns this listing
+      if (data.seller_id !== user?.id) {
+        Alert.alert('Erreur', 'Vous ne pouvez pas modifier cette annonce');
+        router.back();
+        return;
+      }
+
+      setTitle(data.title);
+      setCategory(data.category?.slug || '');
+      setDescription(data.description);
+      setPrice(data.price.toString());
+      setImages(data.images || []);
+    } catch (error) {
+      console.error('Error loading listing:', error);
+      Alert.alert('Erreur', 'Impossible de charger l\'annonce');
+      router.back();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const pickImages = async () => {
     if (images.length >= 5) {
@@ -90,21 +117,7 @@ export default function PostScreen() {
     setShowCategoryModal(false);
   };
 
-
-
   const handleSubmit = async () => {
-    if (!user?.phone || !user?.location) {
-      Alert.alert(
-        'Profil incomplet',
-        'Complétez votre numéro WhatsApp et votre ville.',
-        [
-          { text: 'Compléter', onPress: () => router.push('/auth/complete-profile') },
-          { text: 'Annuler', style: 'cancel' },
-        ]
-      );
-      return;
-    }
-
     if (!title || !category || !description || !price || images.length === 0) {
       Alert.alert('Erreur', 'Tous les champs et au moins une image sont requis.');
       return;
@@ -113,20 +126,7 @@ export default function PostScreen() {
     setIsSubmitting(true);
 
     try {
-      // ---------- Credits ----------
-      const { data: userData, error: userErr } = await supabase
-        .from('users')
-        .select('credits')
-        .eq('id', user.id)
-        .single();
-      if (userErr) throw new Error(`Erreur lors de la vérification des crédits: ${userErr.message}`);
-      if (!userData || userData.credits <= 0) {
-        setShowNoCreditsPopup(true);
-        setIsSubmitting(false);
-        return;
-      }
-
-      // ---------- Category ----------
+      // Get category ID
       const { data: catData, error: catErr } = await supabase
         .from('categories')
         .select('id')
@@ -135,46 +135,40 @@ export default function PostScreen() {
       if (catErr) throw new Error(`Erreur catégorie: ${catErr.message}`);
       if (!catData) throw new Error('Catégorie introuvable');
 
-      // Helper function to get proper MIME type
-      const getMimeType = (uri: string): string => {
-        const extension = uri.split('.').pop()?.toLowerCase() || 'jpg';
-        const mimeTypes: Record<string, string> = {
-          jpg: 'image/jpeg',
-          jpeg: 'image/jpeg',
-          png: 'image/png',
-          gif: 'image/gif',
-          webp: 'image/webp',
-        };
-        return mimeTypes[extension] || 'image/jpeg'; // Default to JPEG
-      };
-
-      // ---------- IMAGE UPLOAD ----------
+      // Upload new images (those that are local URIs)
       const imageUrls = await Promise.all(
         images.map(async (uri, idx) => {
+          // If it's already a URL, keep it
+          if (uri.startsWith('http')) {
+            return uri;
+          }
+
+          // Upload new image
           try {
-            const mimeType = getMimeType(uri);
             const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-            const fileName = `${user.id}/${Date.now()}-${idx}.${ext}`;
+            const fileName = `${user!.id}/${Date.now()}-${idx}.${ext}`;
 
-            console.log(`Uploading image: ${fileName}, MIME type: ${mimeType}`);
+            let fileData;
 
-            // Fetch the file and convert to ArrayBuffer
-            const response = await fetch(uri);
-            const blob = await response.blob();
-            const arrayBuffer = await blob.arrayBuffer();
+            if (Platform.OS === 'web') {
+              const response = await fetch(uri);
+              fileData = await response.blob();
+            } else {
+              const base64 = await FileSystem.readAsStringAsync(uri, {
+                encoding: FileSystem.EncodingType.Base64,
+              });
+              fileData = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+            }
 
             const { error: uploadError } = await supabase.storage
               .from('listings')
-              .upload(fileName, arrayBuffer, {
-                contentType: mimeType,
+              .upload(fileName, fileData, {
+                contentType: `image/${ext}`,
                 cacheControl: '3600',
                 upsert: false,
               });
 
-            if (uploadError) {
-              console.error('Upload error details:', uploadError);
-              throw uploadError;
-            }
+            if (uploadError) throw uploadError;
 
             const { data: urlData } = supabase.storage
               .from('listings')
@@ -188,125 +182,42 @@ export default function PostScreen() {
         })
       );
 
-      // ---------- INSERT LISTING ----------
-      const { data: listing, error: insErr } = await supabase
+      // Update listing
+      const { error: updateErr } = await supabase
         .from('listings')
-        .insert({
-          seller_id: user.id,
+        .update({
           title,
           category_id: catData.id,
           description,
           price: parseFloat(price),
           images: imageUrls,
-          status: 'active',
-          location: user.location,
         })
-        .select()
-        .single();
-      if (insErr) throw new Error(`Erreur d'insertion: ${insErr.message}`);
+        .eq('id', id);
 
-      // ---------- DEDUCT CREDIT ----------
-      const { error: credErr } = await supabase
-        .from('users')
-        .update({ credits: userData.credits - 1 })
-        .eq('id', user.id);
-      if (credErr) throw new Error(`Erreur de déduction de crédit: ${credErr.message}`);
+      if (updateErr) throw new Error(`Erreur de mise à jour: ${updateErr.message}`);
 
-      setNewListingId(listing.id);
-      setShowSuccessPopup(true);
-      resetForm();
+      Alert.alert('Succès', 'Annonce mise à jour', [
+        {
+          text: 'OK',
+          onPress: () => router.push(`/listing/${id}`),
+        },
+      ]);
     } catch (err: any) {
       console.error('Submit error:', err);
-      Alert.alert('Erreur', err.message ?? 'Publication échouée.');
+      Alert.alert('Erreur', err.message ?? 'Mise à jour échouée.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // -------------------------------------------------------------------------
-  // UI (unchanged)
-  // -------------------------------------------------------------------------
-  if (!user) {
+  if (loading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-            <View style={styles.headerIcons}>
-              <TouchableOpacity style={styles.iconButton}>
-                <Bell size={24} color="#1e293b" strokeWidth={2} />
-              </TouchableOpacity>
-            </View>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#9bbd1f" />
+            <Text style={styles.loadingText}>Chargement...</Text>
           </View>
-        
-        <ScrollView 
-          style={styles.scrollView} 
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          
-          <View style={styles.messageContainer}>
-            <View style={styles.messageCard}>
-              <View style={styles.messageIconContainer}>
-                <Text style={styles.messageIcon}>🔐</Text>
-              </View>
-              <Text style={styles.messageTitle}>Connexion requise</Text>
-              <Text style={styles.messageText}>Connectez-vous pour publier vos annonces et commencer à vendre.</Text>
-              <TouchableOpacity style={styles.modernActionButton} onPress={() => router.push('/auth/login')}>
-                <LinearGradient
-                  colors={['#9bbd1f', '#7da01a']}
-                  style={styles.modernActionButtonGradient}
-                >
-                  <Text style={styles.buttonText}>Se connecter</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </ScrollView>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!user.phone || !user.location) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-            <View style={styles.headerIcons}>
-              <TouchableOpacity style={styles.iconButton}>
-                <Bell size={24} color="#1e293b" strokeWidth={2} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        
-        <ScrollView 
-          style={styles.scrollView} 
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          
-          <View style={styles.messageContainer}>
-            <View style={styles.messageCard}>
-              <View style={styles.messageIconContainer}>
-                <Text style={styles.messageIcon}>👤</Text>
-              </View>
-              <Text style={styles.messageTitle}>Profil incomplet</Text>
-              <Text style={styles.messageText}>Complétez votre profil avec votre numéro WhatsApp et votre ville pour publier des annonces.</Text>
-              <TouchableOpacity style={styles.modernActionButton} onPress={() => router.push('/auth/complete-profile')}>
-                <LinearGradient
-                  colors={['#9bbd1f', '#7da01a']}
-                  style={styles.modernActionButtonGradient}
-                >
-                  <Text style={styles.buttonText}>Compléter mon profil</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </ScrollView>
         </View>
       </SafeAreaView>
     );
@@ -322,17 +233,16 @@ export default function PostScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color="#1e293b" strokeWidth={2} />
+          </TouchableOpacity>
           <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-          <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Bell size={24} color="#1e293b" strokeWidth={2} />
-            </TouchableOpacity>
-          </View>
+          <View style={{ width: 40 }} />
         </View>
         
         <View style={styles.formCard}>
-          <Text style={styles.pageTitle}>Nouvelle annonce</Text>
-          <Text style={styles.pageSubtitle}>Publiez votre article en quelques étapes</Text>
+          <Text style={styles.pageTitle}>Modifier l'annonce</Text>
+          <Text style={styles.pageSubtitle}>Mettez à jour les informations de votre article</Text>
 
           {/* Images */}
           <View style={styles.inputGroup}>
@@ -404,22 +314,6 @@ export default function PostScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Custom Category Input */}
-          {category === 'autre' && (
-            <View style={styles.inputGroup}>
-              <View style={styles.inputContainer}>
-                <TextInput 
-                  style={styles.input} 
-                  value={customCategory} 
-                  onChangeText={setCustomCategory} 
-                  placeholder="Entrez votre catégorie personnalisée" 
-                  placeholderTextColor="#94a3b8"
-                  maxLength={50} 
-                />
-              </View>
-            </View>
-          )}
-
           {/* Description */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
@@ -479,7 +373,7 @@ export default function PostScreen() {
               style={styles.submitButtonGradient}
             >
               <Text style={styles.submitButtonText}>
-                {isSubmitting ? '⏳ Publication en cours...' : "🚀 Publier l'annonce"}
+                {isSubmitting ? '⏳ Mise à jour en cours...' : "✓ Enregistrer les modifications"}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -531,30 +425,6 @@ export default function PostScreen() {
           </TouchableOpacity>
         </Modal>
       </ScrollView>
-
-      {/* Pop-ups */}
-      <Popup
-        visible={showSuccessPopup}
-        title="Annonce publiée !"
-        message="Voir l'annonce ?"
-        buttonText="Voir"
-        onClose={() => setShowSuccessPopup(false)}
-        onConfirm={() => {
-          setShowSuccessPopup(false);
-          newListingId && router.push(`/listing/${newListingId}`);
-        }}
-      />
-      <Popup
-        visible={showNoCreditsPopup}
-        title="Crédits épuisés"
-        message="Achetez-en pour continuer."
-        buttonText="Acheter"
-        onClose={() => setShowNoCreditsPopup(false)}
-        onConfirm={() => {
-          setShowNoCreditsPopup(false);
-          router.push('/(tabs)/profile');
-        }}
-      />
       </View>
     </SafeAreaView>
   );
@@ -569,8 +439,18 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: '#f8fafc' 
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
+    marginTop: 16,
+  },
   
-  // Header styles (matching profile page)
+  // Header styles
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -581,74 +461,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
-  logoImage: {
-    width: 120,
-    height: 36,
-  },
-  headerIcons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#f8fafc',
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  // Message card styles
-  messageContainer: {
-    padding: 24,
-    flex: 1,
-    justifyContent: 'center',
-  },
-  messageCard: { 
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 40,
-    alignItems: 'center',
-  },
-  messageIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f0fdf4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  messageIcon: {
-    fontSize: 40,
-  },
-  messageTitle: { 
-    fontSize: 26, 
-    fontWeight: '700', 
-    color: '#1e293b', 
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  messageText: { 
-    fontSize: 16, 
-    color: '#64748b', 
-    marginBottom: 32, 
-    lineHeight: 24,
-    textAlign: 'center',
-  },
-  modernActionButton: {
-    borderRadius: 16,
-    shadowColor: '#9bbd1f',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  modernActionButtonGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    borderRadius: 16,
-    alignItems: 'center',
+  logoImage: {
+    width: 140,
+    height: 42,
   },
 
   // Form styles
@@ -656,7 +479,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100, // Add padding to prevent navbar overlap
+    paddingBottom: 100,
   },
   formCard: {
     backgroundColor: '#fff',
@@ -818,11 +641,6 @@ const styles = StyleSheet.create({
   },
 
   // Button styles
-  buttonText: { 
-    color: '#fff', 
-    fontSize: 17, 
-    fontWeight: '700' 
-  },
   submitButton: {
     borderRadius: 16,
     marginTop: 24,

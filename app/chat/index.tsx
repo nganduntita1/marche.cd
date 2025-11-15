@@ -39,8 +39,8 @@ export default function ConversationsScreen() {
         .select(`
           *,
           listing:listings(id, title, images, price),
-          buyer:users!conversations_buyer_id_fkey(id, name, email),
-          seller:users!conversations_seller_id_fkey(id, name, email)
+          buyer:users!conversations_buyer_id_fkey(id, name, email, profile_picture),
+          seller:users!conversations_seller_id_fkey(id, name, email, profile_picture)
         `)
         .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
         .order('last_message_at', { ascending: false });

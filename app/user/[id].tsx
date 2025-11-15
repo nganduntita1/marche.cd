@@ -22,6 +22,7 @@ type UserProfile = {
   email: string;
   phone: string | null;
   location: string | null;
+  profile_picture?: string;
   created_at: string;
 };
 
@@ -241,19 +242,26 @@ export default function UserProfileScreen() {
       <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#1e293b" />
+          <ArrowLeft size={24} color="#1e293b" strokeWidth={2} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profil</Text>
-        <View style={{ width: 24 }} />
+        <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
-              {profile.name?.[0]?.toUpperCase() || profile.email?.[0]?.toUpperCase() || '?'}
-            </Text>
-          </View>
+          {profile.profile_picture ? (
+            <Image 
+              source={{ uri: profile.profile_picture }} 
+              style={styles.avatarImage}
+            />
+          ) : (
+            <View style={styles.avatarContainer}>
+              <Text style={styles.avatarText}>
+                {profile.name?.[0]?.toUpperCase() || profile.email?.[0]?.toUpperCase() || '?'}
+              </Text>
+            </View>
+          )}
 
           <Text style={styles.userName}>{profile.name || 'Utilisateur'}</Text>
           
@@ -395,7 +403,7 @@ export default function UserProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#bedc39',
+    backgroundColor: '#fff',
   },
   container: {
     flex: 1,
@@ -421,40 +429,58 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#f1f5f9',
   },
   backButton: {
-    padding: 4,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
+  logoImage: {
+    width: 140,
+    height: 42,
   },
   content: {
     flex: 1,
   },
   profileCard: {
     backgroundColor: '#fff',
+    margin: 16,
     padding: 24,
+    borderRadius: 16,
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     backgroundColor: '#9bbd1f',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
+  avatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    marginBottom: 16,
+  },
   avatarText: {
-    fontSize: 32,
+    fontSize: 40,
     fontWeight: '700',
     color: '#fff',
   },
@@ -467,7 +493,7 @@ const styles = StyleSheet.create({
   locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     marginBottom: 16,
   },
   locationText: {
@@ -476,7 +502,7 @@ const styles = StyleSheet.create({
   },
   ratingContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   starsContainer: {
     flexDirection: 'row',
@@ -485,13 +511,14 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 16,
+    fontWeight: '600',
     color: '#64748b',
   },
   rateButton: {
     backgroundColor: '#9bbd1f',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
   },
   rateButtonText: {
     color: '#fff',
@@ -501,28 +528,34 @@ const styles = StyleSheet.create({
   ratingForm: {
     backgroundColor: '#fff',
     margin: 16,
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   formTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1e293b',
     marginBottom: 16,
   },
   commentInput: {
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
     color: '#1e293b',
-    minHeight: 80,
+    minHeight: 100,
     textAlignVertical: 'top',
     marginTop: 16,
     marginBottom: 16,
+    backgroundColor: '#f8fafc',
   },
   formButtons: {
     flexDirection: 'row',
@@ -530,10 +563,12 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   cancelButtonText: {
     fontSize: 16,
@@ -543,8 +578,8 @@ const styles = StyleSheet.create({
   submitButton: {
     flex: 1,
     backgroundColor: '#9bbd1f',
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
   },
   submitButtonDisabled: {
@@ -566,24 +601,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   listingImage: {
-    width: 100,
-    height: 100,
+    width: 110,
+    height: 110,
     backgroundColor: '#f1f5f9',
   },
   listingInfo: {
     flex: 1,
-    padding: 12,
+    padding: 16,
   },
   listingTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1e293b',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   listingPrice: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: '#9bbd1f',
     marginBottom: 8,
@@ -594,7 +634,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listingStatus: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: '#22c55e',
   },
@@ -602,7 +642,7 @@ const styles = StyleSheet.create({
     color: '#ef4444',
   },
   listingDate: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#94a3b8',
   },
   ratingsSection: {
@@ -610,15 +650,17 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1e293b',
     marginBottom: 16,
   },
   emptyRatings: {
     backgroundColor: '#fff',
-    padding: 32,
-    borderRadius: 12,
+    padding: 40,
+    borderRadius: 16,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   emptyText: {
     fontSize: 16,
@@ -626,11 +668,16 @@ const styles = StyleSheet.create({
   },
   ratingItem: {
     backgroundColor: '#fff',
-    padding: 16,
+    padding: 20,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   ratingHeader: {
     flexDirection: 'row',
@@ -640,24 +687,24 @@ const styles = StyleSheet.create({
   },
   raterName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1e293b',
   },
   ratingComment: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#475569',
-    lineHeight: 20,
+    lineHeight: 22,
     marginBottom: 8,
   },
   ratingDate: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#94a3b8',
   },
   button: {
     backgroundColor: '#9bbd1f',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
   },
   buttonText: {
     color: '#fff',

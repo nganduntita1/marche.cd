@@ -10,12 +10,12 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import ListingCard from '@/components/ListingCard';
 import CreditCard from '@/components/CreditCard';
+import { Bell, MapPin, Phone, Mail, Star, Package } from 'lucide-react-native';
 
 type Listing = {
   id: string;
@@ -178,9 +178,14 @@ export default function ProfileScreen() {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
-        <View style={styles.gradientHeader}>
+        {/* Header */}
+        <View style={styles.header}>
           <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-          <Text style={styles.tagline}>Connectez-vous pour continuer</Text>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity style={styles.iconButton}>
+              <Bell size={24} color="#1e293b" strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.messageContainer}>
@@ -208,8 +213,17 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
+        <View style={styles.headerIcons}>
+          <TouchableOpacity style={styles.iconButton}>
+            <Bell size={24} color="#1e293b" strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <ScrollView 
-        style={styles.container}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
         <RefreshControl
@@ -221,43 +235,101 @@ export default function ProfileScreen() {
       }
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.gradientHeader}>
-        <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-        {/* <Text style={styles.headerTitle}>Mon Profil</Text> */}
-      </View>
-
       <View style={styles.profileCard}>
         <View style={styles.profileHeader}>
-          <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
-              {user.email?.[0].toUpperCase() || '?'}
-            </Text>
-          </View>
+          <TouchableOpacity 
+            style={styles.avatarContainer}
+            onPress={() => router.push('/edit-profile')}
+          >
+            {user.profile_picture ? (
+              <Image 
+                source={{ uri: user.profile_picture }} 
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarText}>
+                  {user.name?.[0]?.toUpperCase() || user.email?.[0].toUpperCase() || '?'}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
           <View style={styles.profileInfo}>
-            <Text style={styles.emailText}>{user.email}</Text>
-            <View style={styles.infoRow}>
-              <Text style={styles.phoneText}>{user.phone || 'Aucun numéro'}</Text>
+            <Text style={styles.userName}>{user.name || 'Utilisateur'}</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Star size={14} color="#f59e0b" fill="#f59e0b" />
+                <Text style={styles.statValue}>4.8</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Package size={14} color="#64748b" />
+                <Text style={styles.statValue}>{listings.length}</Text>
+              </View>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.locationText}>{user.location || 'Aucune ville'}</Text>
-            </View>
-          </View>
-          <View style={styles.creditContainer}>
-            <View style={styles.creditCircle}>
-              <Text style={styles.creditNumber}>{credits || 0}</Text>
-            </View>
-            <Text style={styles.creditLabel}>Crédits</Text>
           </View>
         </View>
 
+        <View style={styles.infoSection}>
+          <View style={styles.infoItem}>
+            <Mail size={18} color="#64748b" />
+            <Text style={styles.infoText}>{user.email}</Text>
+          </View>
+          <View style={styles.infoItem}>
+            <Phone size={18} color="#64748b" />
+            <Text style={styles.infoText}>{user.phone || 'Aucun numéro'}</Text>
+          </View>
+          <View style={styles.infoItem}>
+            <MapPin size={18} color="#64748b" />
+            <Text style={styles.infoText}>{user.location || 'Aucune ville'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.creditBanner}>
+          <View style={styles.creditInfo}>
+            <Text style={styles.creditLabel}>Crédits disponibles</Text>
+            <Text style={styles.creditValue}>{credits || 0}</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.addCreditButton}
+            onPress={() => {
+              // Scroll to credits section
+            }}
+          >
+            <Text style={styles.addCreditButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
+
+        {!user.profile_picture && (
+          <View style={styles.promptBanner}>
+            <Text style={styles.promptText}>
+              📸 Ajoutez une photo de profil pour inspirer confiance
+            </Text>
+            <TouchableOpacity
+              style={styles.promptButton}
+              onPress={() => router.push('/edit-profile')}
+            >
+              <Text style={styles.promptButtonText}>Ajouter</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.modernActionButton}
+            onPress={() => router.push('/edit-profile')}
+          >
+            <Text style={styles.actionButtonText}>
+              Modifier mon profil
+            </Text>
+          </TouchableOpacity>
           {(!user.phone || !user.location) && (
             <TouchableOpacity
-              style={styles.modernActionButton}
+              style={styles.completeProfileButton}
               onPress={() => router.push('/auth/complete-profile')}
             >
-              <Text style={styles.actionButtonText}>
-                Compléter mon profil
+              <Text style={styles.completeProfileButtonText}>
+                Compléter les informations
               </Text>
             </TouchableOpacity>
           )}
@@ -268,11 +340,15 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.creditsSection}>
-        <Text style={styles.sectionTitle}>Acheter des crédits</Text>
-        <Text style={styles.sectionSubtitle}>
-          Achetez des crédits pour publier vos annonces. Chaque annonce coûte 1 crédit.
-        </Text>
-        <View style={styles.listingsGrid}>
+        <View style={styles.sectionHeaderWithIcon}>
+          <View>
+            <Text style={styles.sectionTitle}>Acheter des crédits</Text>
+            <Text style={styles.sectionSubtitle}>
+              Chaque annonce coûte 1 crédit
+            </Text>
+          </View>
+        </View>
+        <View style={styles.creditsGrid}>
           <CreditCard amount={10} credits={10} />
           <CreditCard amount={25} credits={30} />
           <CreditCard amount={75} credits={100} />
@@ -292,10 +368,13 @@ export default function ProfileScreen() {
 
         {listings.length === 0 ? (
           <View style={styles.emptyStateCard}>
+            <View style={styles.emptyStateIcon}>
+              <Package size={48} color="#cbd5e1" />
+            </View>
             <Text style={styles.emptyStateTitle}>Aucune annonce</Text>
             <Text style={styles.emptyStateText}>
-              Vous n'avez pas encore publié d'annonces.
-              Commencez à vendre en publiant votre première annonce !
+              Vous n'avez pas encore publié d'annonces.{'\n'}
+              Commencez à vendre dès maintenant !
             </Text>
             <TouchableOpacity
               style={styles.emptyStateButton}
@@ -316,33 +395,9 @@ export default function ProfileScreen() {
                   price={listing.price}
                   image={listing.images[0]}
                   status={listing.status}
+                  isOwner={true}
+                  onDelete={fetchUserListings}
                 />
-                <View style={styles.listingActions}>
-                  {listing.status === 'active' && (
-                    <TouchableOpacity
-                      style={styles.markAsSoldButton}
-                      onPress={() => {
-                        console.log('Mark as sold pressed');
-                        handleMarkAsSold(listing.id);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.markAsSoldButtonText}>
-                        Marquer vendu
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => {
-                      console.log('Delete button clicked!');
-                      handleDeleteListing(listing.id);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.deleteButtonText}>×</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             ))}
           </View>
@@ -357,176 +412,198 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#bedc39',
+    backgroundColor: '#fff',
   },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
   },
   scrollContent: {
     paddingBottom: 100,
   },
-  gradientHeader: {
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 24,
     paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: '#bedc39',
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#f1f5f9',
   },
   logoImage: {
-    width: '100%',
-    height: 64,
-    borderRadius: 12,
-    marginBottom: 12,
+    width: 160,
+    height: 48,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1e293b',
+  headerIcons: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  tagline: {
-    fontSize: 16,
-    color: '#64748b',
-  },
-  
-  messageContainer: {
-    flex: 1,
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f8fafc',
     justifyContent: 'center',
-    padding: 16,
-  },
-  messageCard: {
-    backgroundColor: '#f0fdf4',
-    borderRadius: 12,
-    padding: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#9bbd1f',
-  },
-  messageTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#9bbd1f',
-    marginBottom: 8,
-  },
-  messageText: {
-    fontSize: 14,
-    color: '#334155',
-    marginBottom: 16,
-    lineHeight: 20,
+    alignItems: 'center',
   },
 
   profileCard: {
     backgroundColor: '#fff',
     margin: 16,
     borderRadius: 16,
-    padding: 20,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   avatarContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginRight: 16,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  avatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#9bbd1f',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
-    shadowColor: '#9bbd1f',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
   },
   avatarText: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
     color: '#fff',
   },
   profileInfo: {
     flex: 1,
   },
-  emailText: {
-    fontSize: 18,
+  userName: {
+    fontSize: 20,
     fontWeight: '700',
     color: '#1e293b',
     marginBottom: 8,
   },
-  infoRow: {
-    marginBottom: 4,
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  phoneText: {
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  statDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: '#e2e8f0',
+  },
+  infoSection: {
+    marginBottom: 20,
+    gap: 12,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  infoText: {
     fontSize: 15,
     color: '#64748b',
-    fontWeight: '500',
+    flex: 1,
   },
-  locationText: {
-    fontSize: 15,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  creditContainer: {
+  creditBanner: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f0fdf4',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
   },
-  creditCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#9bbd1f',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    shadowColor: '#9bbd1f',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  creditNumber: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#fff',
+  creditInfo: {
+    flex: 1,
   },
   creditLabel: {
-    fontSize: 12,
-    color: '#64748b',
+    fontSize: 13,
+    color: '#166534',
     fontWeight: '600',
-    textAlign: 'center',
-  },
-
-  // Credit section styles
-  creditSection: {
-    marginBottom: 24,
-  },
-  creditCard: {
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-  },
-
-  creditBadge: {
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  creditBadgeGradient: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 20,
+    marginBottom: 4,
   },
   creditValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#16a34a',
+  },
+  addCreditButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#22c55e',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addCreditButtonText: {
     fontSize: 24,
     fontWeight: '700',
+    color: '#fff',
+  },
+
+  // Prompt banner
+  promptBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fef3c7',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  promptText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#92400e',
+    fontWeight: '500',
+    marginRight: 12,
+  },
+  promptButton: {
+    backgroundColor: '#f59e0b',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  promptButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#fff',
   },
 
@@ -535,14 +612,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   modernActionButton: {
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  buttonGradient: {
+    backgroundColor: '#9bbd1f',
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
@@ -552,6 +622,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  completeProfileButton: {
+    backgroundColor: '#f0fdf4',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  completeProfileButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#16a34a',
   },
   logoutButton: {
     backgroundColor: '#f8fafc',
@@ -570,56 +654,46 @@ const styles = StyleSheet.create({
 
   // Section styles
   creditsSection: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   listingsSection: {
-    padding: 16,
+    paddingTop: 8,
   },
-  sectionHeaderCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+  sectionHeaderWithIcon: {
+    marginBottom: 20,
+    paddingHorizontal: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 20,
+    paddingHorizontal: 16,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#334155',
-    marginBottom: 8,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 4,
   },
   sectionSubtitle: {
     fontSize: 14,
     color: '#64748b',
     lineHeight: 20,
-    marginBottom: 16,
+  },
+  creditsGrid: {
+    gap: 12,
+    paddingHorizontal: 16,
   },
   newListingButton: {
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  newListingButtonGradient: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
+    backgroundColor: '#9bbd1f',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
   },
   newListingButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#fff',
   },
@@ -627,49 +701,44 @@ const styles = StyleSheet.create({
   // Empty state
   emptyStateCard: {
     backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 32,
+    borderRadius: 16,
+    padding: 48,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginHorizontal: 16,
   },
   emptyStateIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     backgroundColor: '#f1f5f9',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 20,
   },
-  emptyStateEmoji: {
-    fontSize: 32,
-  },
   emptyStateTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: '#1e293b',
     marginBottom: 12,
   },
   emptyStateText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#64748b',
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
+    lineHeight: 22,
+    marginBottom: 28,
   },
   emptyStateButton: {
     backgroundColor: '#9bbd1f',
     paddingVertical: 16,
-    paddingHorizontal: 32,
+    paddingHorizontal: 40,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowColor: '#9bbd1f',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 4,
   },
   emptyStateButtonText: {
@@ -680,64 +749,47 @@ const styles = StyleSheet.create({
   },
 
   // Listings grid
-  creditsGrid: {
-    gap: 12,
-  },
   listingsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    paddingHorizontal: 16,
   },
   listingContainer: {
     width: '48%',
-    marginBottom: 16,
   },
-  listingActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    gap: 8,
-  },
-  markAsSoldButton: {
+
+  // Message container
+  messageContainer: {
     flex: 1,
-    backgroundColor: '#f0fdf4',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-  },
-  markAsSoldButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#16a34a',
-  },
-  deleteButton: {
-    backgroundColor: '#fef2f2',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    minWidth: 44,
-    minHeight: 44,
     justifyContent: 'center',
-    alignItems: 'center',
+    padding: 24,
   },
-  deleteButtonText: {
-    fontSize: 24,
+  messageCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  messageTitle: {
+    fontSize: 20,
     fontWeight: '700',
-    color: '#dc2626',
-    lineHeight: 24,
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  messageText: {
+    fontSize: 15,
+    color: '#64748b',
+    marginBottom: 20,
+    lineHeight: 22,
   },
 
   // Button styles
   button: {
     backgroundColor: '#9bbd1f',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
   },
   buttonText: {
@@ -745,5 +797,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-
 });
