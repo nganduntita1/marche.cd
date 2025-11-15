@@ -34,15 +34,11 @@ export default function MessagesScreen() {
     if (!user) return;
     loadConversations();
     
-    console.log('[MESSAGES] Setting up subscriptions');
-    
     // Subscribe to broadcast for instant message updates
     const broadcastChannel = supabase.channel(`messages-broadcast-${user.id}`);
     broadcastChannel.on('broadcast', { event: 'new-message' }, (payload) => {
-      console.log('[MESSAGES] Broadcast received');
       const msg = (payload.payload || payload) as any;
       if (msg?.conversation_id) {
-        console.log('[MESSAGES] Updating conversation with new message:', msg.conversation_id);
         setConversations((prev) => {
           // Update the conversation and re-sort by last_message_at
           const updated = prev.map((conv) => {
@@ -61,13 +57,22 @@ export default function MessagesScreen() {
           
           // Update the ref as well
           conversationsRef.current = updated;
-          console.log('[MESSAGES] Broadcast: Conversations updated and sorted');
           return updated;
         });
         
-        // Fetch actual unread count from database instead of just incrementing
-        // This ensures accuracy even if multiple messages arrive
+        // Immediately update unread count for instant visual feedback
         if (msg.sender_id !== user.id) {
+          // First, optimistically increment the count for instant UI update
+          setUnreadCounts((prev) => {
+            const currentCount = prev[msg.conversation_id] || 0;
+            const newCount = currentCount + 1;
+            return {
+              ...prev,
+              [msg.conversation_id]: newCount,
+            };
+          });
+          
+          // Then fetch the actual count to ensure accuracy
           supabase
             .from('messages')
             .select('id', { count: 'exact', head: true })
@@ -76,20 +81,13 @@ export default function MessagesScreen() {
             .eq('is_read', false)
             .then(({ count, error }) => {
               if (!error && count !== null) {
-                console.log('[MESSAGES] Broadcast: Fetched unread count for conversation:', msg.conversation_id, '=', count);
-                setUnreadCounts((prev) => {
-                  const newCounts = {
-                    ...prev,
-                    [msg.conversation_id]: count,
-                  };
-                  console.log('[MESSAGES] Broadcast: Updated unread counts:', newCounts);
-                  return newCounts;
-                });
+                setUnreadCounts((prev) => ({
+                  ...prev,
+                  [msg.conversation_id]: count,
+                }));
               }
             });
-        } else {
-          console.log('[MESSAGES] Broadcast: Message from current user, not updating unread count');
-        }
+        } 
         
         // Refresh global unread count when new message received
         refreshUnreadCount();
@@ -98,35 +96,27 @@ export default function MessagesScreen() {
     
     // Listen for messages-read broadcast event (when messages are marked as read)
     broadcastChannel.on('broadcast', { event: 'messages-read' }, (payload) => {
-      console.log('[MESSAGES] Messages read broadcast received, full payload:', JSON.stringify(payload));
       // Extract the actual data from the payload
       const data = payload?.payload || payload;
-      console.log('[MESSAGES] Extracted data:', JSON.stringify(data));
       
       if (data?.conversation_id) {
         const count = data.count || 1;
-        console.log('[MESSAGES] Decrementing conversation', data.conversation_id, 'by', count);
         
         // Decrement unread count by the number of messages marked as read
         setUnreadCounts((prev) => {
           const currentCount = prev[data.conversation_id] || 0;
           const newCount = Math.max(0, currentCount - count);
-          console.log('[MESSAGES] Unread count change:', data.conversation_id, `${currentCount} -> ${newCount}`);
           return {
             ...prev,
             [data.conversation_id]: newCount,
           };
         });
-        console.log('[MESSAGES] Decremented unread count for conversation:', data.conversation_id, 'by', count);
-      } else {
-        console.log('[MESSAGES] No conversation_id found in broadcast data');
-      }
+      } 
     });
     
     broadcastChannel.subscribe();
 
     // Subscribe to conversations table updates to get real-time last_message updates
-    console.log('[MESSAGES] Setting up conversations UPDATE subscription');
     const conversationsChannel = supabase.channel('conversations-updates');
     conversationsChannel.on(
       'postgres_changes',
@@ -136,7 +126,6 @@ export default function MessagesScreen() {
         table: 'conversations',
       },
       (payload) => {
-        console.log('[MESSAGES] Conversation UPDATE event received:', payload.new);
         const updatedConv = payload.new as any;
         
         // Check if this conversation belongs to the current user
@@ -149,7 +138,6 @@ export default function MessagesScreen() {
               // Update existing conversation
               return prev.map((conv) => {
                 if (conv.id === updatedConv.id) {
-                  console.log('[MESSAGES] Updating conversation last_message:', updatedConv.last_message);
                   return {
                     ...conv,
                     last_message: updatedConv.last_message,
@@ -164,7 +152,6 @@ export default function MessagesScreen() {
               });
             } else {
               // New conversation, reload all
-              console.log('[MESSAGES] New conversation detected, reloading...');
               loadConversations();
               return prev;
             }
@@ -179,7 +166,6 @@ export default function MessagesScreen() {
             .eq('is_read', false)
             .then(({ count, error }) => {
               if (!error && count !== null) {
-                console.log('[MESSAGES] Updated unread count for conversation:', updatedConv.id, '=', count);
                 setUnreadCounts((prev) => ({
                   ...prev,
                   [updatedConv.id]: count,
@@ -192,7 +178,6 @@ export default function MessagesScreen() {
     conversationsChannel.subscribe();
 
     // Subscribe to message INSERT events for real-time unread count updates
-    console.log('[MESSAGES] Setting up INSERT subscription for new messages');
     const messagesInsertChannel = supabase.channel('messages-insert-events');
     messagesInsertChannel.on(
       'postgres_changes',
@@ -202,12 +187,10 @@ export default function MessagesScreen() {
         table: 'messages',
       },
       (payload) => {
-        console.log('[MESSAGES] Message INSERT event received:', payload.new);
         const newMessage = payload.new as any;
         
         // Only update count if the message is not from the current user
         if (newMessage?.conversation_id && newMessage.sender_id !== user.id) {
-          console.log('[MESSAGES] New message from another user, fetching unread count...');
           
           // Fetch the actual unread count for this conversation
           supabase
@@ -218,7 +201,6 @@ export default function MessagesScreen() {
             .eq('is_read', false)
             .then(({ count, error }) => {
               if (!error && count !== null) {
-                console.log('[MESSAGES] INSERT: Updated unread count for conversation:', newMessage.conversation_id, '=', count);
                 setUnreadCounts((prev) => ({
                   ...prev,
                   [newMessage.conversation_id]: count,
@@ -233,7 +215,6 @@ export default function MessagesScreen() {
     messagesInsertChannel.subscribe();
 
     // Subscribe to message UPDATE events to track when messages are marked as read
-    console.log('[MESSAGES] Setting up UPDATE subscription for real-time unread tracking');
     const messagesUpdateChannel = supabase.channel('messages-update-events');
     messagesUpdateChannel.on(
       'postgres_changes',
@@ -243,10 +224,8 @@ export default function MessagesScreen() {
         table: 'messages',
       },
       (payload) => {
-        console.log('[MESSAGES] Message UPDATE event received:', payload.new);
         const newMessage = payload.new as any;
         if (newMessage?.conversation_id && newMessage?.is_read === true) {
-          console.log('[MESSAGES] Message marked as read, refetching unread counts...');
           // Use the latest conversations from the ref for real-time accuracy
           loadUnreadCounts(conversationsRef.current);
         }
@@ -255,14 +234,11 @@ export default function MessagesScreen() {
     messagesUpdateChannel.subscribe();
 
     // Polling fallback: check for updates every 3 seconds
-    console.log('[MESSAGES] Starting polling for updates');
     pollingIntervalRef.current = setInterval(() => {
-      console.log('[MESSAGES] Polling for updates...');
       pollForUpdates();
     }, 3000);
 
     return () => {
-      console.log('[MESSAGES] Cleaning up subscriptions');
       supabase.removeChannel(broadcastChannel);
       supabase.removeChannel(conversationsChannel);
       supabase.removeChannel(messagesInsertChannel);
@@ -277,7 +253,6 @@ export default function MessagesScreen() {
   // Refresh unread counts when screen is focused
   useFocusEffect(
     React.useCallback(() => {
-      console.log('[MESSAGES] Screen focused, doing full refresh');
       // Reload conversations to get latest last_message
       loadConversations();
       // Refresh global unread count
@@ -309,7 +284,7 @@ export default function MessagesScreen() {
       // Load unread counts for each conversation
       await loadUnreadCounts(convsData);
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      // Error handling
     } finally {
       setLoading(false);
     }
@@ -319,7 +294,6 @@ export default function MessagesScreen() {
     if (!user) return;
 
     try {
-      console.log('[MESSAGES-LIST] Loading unread counts for', convs.length, 'conversations');
       const counts: Record<string, number> = {};
       
       for (const conv of convs) {
@@ -333,19 +307,14 @@ export default function MessagesScreen() {
 
         if (!error && data) {
           counts[conv.id] = data.length;
-          if (data.length > 0) {
-            console.log('[MESSAGES-LIST] Conversation', conv.id, 'has', data.length, 'unread messages');
-          }
         } else {
-          console.log('[MESSAGES-LIST] Error or no data for conversation', conv.id, ':', error);
           counts[conv.id] = 0;
         }
       }
       
-      console.log('[MESSAGES-LIST] Final unread counts:', counts);
       setUnreadCounts(counts);
     } catch (error) {
-      console.error('[MESSAGES-LIST] Error loading unread counts:', error);
+      // Error handling
     }
   };
 
@@ -366,35 +335,36 @@ export default function MessagesScreen() {
 
       if (error) throw error;
 
-      setConversations((prev) => {
-        // Check if anything changed
-        const newData = data || [];
-        if (prev.length !== newData.length) {
-          console.log('[MESSAGES] Polling: conversation count changed');
-          return newData;
-        }
-
+      const newData = data || [];
+      
+      // Check if anything changed
+      let hasChanges = false;
+      
+      if (conversationsRef.current.length !== newData.length) {
+        hasChanges = true;
+      } else {
         // Check if any conversation's last_message changed
-        let hasChanges = false;
-        const updated = newData.map((conv) => {
-          const prevConv = prev.find((c) => c.id === conv.id);
+        for (const conv of newData) {
           const key = conv.id;
           const lastMsgHash = `${conv.last_message}-${conv.last_message_at}`;
 
           if (lastUpdateRef.current[key] !== lastMsgHash) {
-            console.log('[MESSAGES] Polling: detected update in conversation', conv.id);
             lastUpdateRef.current[key] = lastMsgHash;
             hasChanges = true;
           }
-          return conv;
-        });
+        }
+      }
 
-        return hasChanges ? updated : prev;
-      });
+      if (hasChanges) {
+        setConversations(newData);
+        conversationsRef.current = newData;
+        // Also refresh unread counts when conversations change
+        await loadUnreadCounts(newData);
+      }
 
       refreshUnreadCount();
     } catch (error) {
-      console.error('Polling error:', error);
+      // Error handling
     }
   };
 
@@ -412,7 +382,6 @@ export default function MessagesScreen() {
           filter: `buyer_id=eq.${user.id},seller_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Conversation updated:', payload);
           loadConversations();
         }
       )
@@ -429,7 +398,6 @@ export default function MessagesScreen() {
           table: 'messages',
         },
         (payload) => {
-          console.log('New message received:', payload);
           loadConversations();
         }
       )
@@ -614,6 +582,36 @@ export default function MessagesScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* TEST NOTIFICATION BUTTON */}
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#9bbd1f',
+            padding: 16,
+            marginHorizontal: 16,
+            marginTop: 8,
+            borderRadius: 12,
+            alignItems: 'center',
+            shadowColor: '#9bbd1f',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.3,
+            shadowRadius: 4,
+            elevation: 4,
+          }}
+          onPress={async () => {
+            console.log('🔔 Testing notification...');
+            const { notificationService } = await import('@/services/notificationService');
+            await notificationService.showLocalNotification(
+              'Test Notification 🎉',
+              'If you see this banner, in-app notifications are working perfectly!',
+              { type: 'new_message' }
+            );
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>
+            🔔 TEST NOTIFICATION BANNER
+          </Text>
+        </TouchableOpacity>
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>

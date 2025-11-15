@@ -15,7 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import ListingCard from '@/components/ListingCard';
 import CreditCard from '@/components/CreditCard';
-import { Bell, MapPin, Phone, Mail, Star, Package } from 'lucide-react-native';
+import { Bell, MapPin, Phone, Mail, Star, Package, Settings } from 'lucide-react-native';
 
 type Listing = {
   id: string;
@@ -219,6 +219,12 @@ export default function ProfileScreen() {
         <View style={styles.headerIcons}>
           <TouchableOpacity style={styles.iconButton}>
             <Bell size={24} color="#1e293b" strokeWidth={2} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => router.push('/settings')}
+          >
+            <Settings size={24} color="#1e293b" strokeWidth={2} />
           </TouchableOpacity>
         </View>
       </View>
@@ -654,10 +660,12 @@ const styles = StyleSheet.create({
 
   // Section styles
   creditsSection: {
+    paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 8,
   },
   listingsSection: {
+    paddingHorizontal: 16,
     paddingTop: 8,
   },
   sectionHeaderWithIcon: {

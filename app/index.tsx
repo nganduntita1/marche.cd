@@ -2,12 +2,25 @@ import { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import * as Notifications from 'expo-notifications';
 
 export default function Index() {
   const { session, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
+    // Request notification permissions on app startup
+    Notifications.requestPermissionsAsync();
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+
     if (!loading) {
       if (session) {
         router.replace('/(tabs)');
