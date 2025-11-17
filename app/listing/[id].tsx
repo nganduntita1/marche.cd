@@ -28,6 +28,7 @@ import { TextStyles } from '@/constants/Typography';
 import SafetyTipsModal from '@/components/SafetyTipsModal';
 import ShareModal from '@/components/ShareModal';
 import PromoteModal from '@/components/PromoteModal';
+import SelectBuyerModal from '@/components/SelectBuyerModal';
 import { Platform } from 'react-native';
 
 export default function ListingDetailScreen() {
@@ -51,6 +52,7 @@ export default function ListingDetailScreen() {
   const [showCustomMessageModal, setShowCustomMessageModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPromoteModal, setShowPromoteModal] = useState(false);
+  const [showSelectBuyerModal, setShowSelectBuyerModal] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -463,33 +465,7 @@ export default function ListingDetailScreen() {
               listing.status === 'active' && (
                 <TouchableOpacity
                   style={styles.headerMarkSoldButton}
-                  onPress={async () => {
-                    Alert.alert(
-                      'Marquer comme vendu',
-                      'Voulez-vous marquer cette annonce comme vendue ?',
-                      [
-                        { text: 'Annuler', style: 'cancel' },
-                        {
-                          text: 'Marquer vendu',
-                          onPress: async () => {
-                            try {
-                              const { error } = await supabase
-                                .from('listings')
-                                .update({ status: 'sold' })
-                                .eq('id', listing.id);
-
-                              if (error) throw error;
-                              Alert.alert('Succès', 'Annonce marquée comme vendue');
-                              loadListing();
-                            } catch (error) {
-                              console.error('Error marking as sold:', error);
-                              Alert.alert('Erreur', 'Impossible de mettre à jour l\'annonce');
-                            }
-                          },
-                        },
-                      ]
-                    );
-                  }}
+                  onPress={() => setShowSelectBuyerModal(true)}
                 >
                   <Text style={styles.headerMarkSoldButtonText}>Marquer vendu</Text>
                 </TouchableOpacity>
@@ -1024,6 +1000,28 @@ export default function ListingDetailScreen() {
         onClose={() => setShowPromoteModal(false)}
         listingId={id as string}
         onSuccess={loadListing}
+      />
+
+      {/* Select Buyer Modal */}
+      <SelectBuyerModal
+        visible={showSelectBuyerModal}
+        onClose={() => setShowSelectBuyerModal(false)}
+        listingId={id as string}
+        sellerId={user?.id || ''}
+        onSuccess={async (buyerId) => {
+          // Mark listing as sold and reload
+          try {
+            const { error } = await supabase
+              .from('listings')
+              .update({ status: 'sold' })
+              .eq('id', id);
+            
+            if (error) throw error;
+            loadListing();
+          } catch (error) {
+            console.error('Error updating listing status:', error);
+          }
+        }}
       />
       </View>
     </SafeAreaView>

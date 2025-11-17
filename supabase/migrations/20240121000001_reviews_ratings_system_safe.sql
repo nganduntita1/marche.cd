@@ -1,0 +1,319 @@
+-- Safe Migration: Reviews & Ratings System
+-- This version safely handles existing objects
+
+-- ============================================================================
+-- DROP EXISTING OBJECTS (if they exist)
+-- ============================================================================
+
+-- Drop triggers first
+DROP TRIGGER IF EXISTS trigger_update_review_timestamp ON reviews;
+
+-- Drop functions (CASCADE will drop dependent objects)
+DROP FUNCTION IF EXISTS create_transaction_with_notifications(UUID, UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS submit_review(UUID, UUID, UUID, UUID, INTEGER, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS get_unread_notification_count(UUID) CASCADE;
+DROP FUNCTION IF EXISTS mark_notifications_read(UUID, UUID[]) CASCADE;
+DROP FUNCTION IF EXISTS update_review_timestamp() CASCADE;
+
+-- ============================================================================
+-- 1. TRANSACTIONS TABLE
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS transactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  seller_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  buyer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending_rating' CHECK (status IN ('pending_rating', 'completed', 'cancelled')),
+  seller_rated BOOLEAN DEFAULT FALSE,
+  buyer_rated BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  completed_at TIMESTAMP WITH TIME ZONE,
+  UNIQUE(listing_id, buyer_id)
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_transactions_seller ON transactions(seller_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_buyer ON transactions(buyer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_listing ON transactions(listing_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status) WHERE status = 'pending_rating';
+
+-- ============================================================================
+-- 2. REVIEWS TABLE
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+  reviewer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reviewee_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(transaction_id, reviewer_id)
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_reviews_reviewee ON reviews(reviewee_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reviews_reviewer ON reviews(reviewer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reviews_transaction ON reviews(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_listing ON reviews(listing_id);
+
+-- ============================================================================
+-- 3. NOTIFICATIONS TABLE
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('rating_request', 'rating_received', 'transaction_completed', 'listing_sold')),
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  data JSONB DEFAULT '{}',
+  read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read) WHERE read = FALSE;
+CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(user_id, type);
+
+-- ============================================================================
+-- 4. USER RATING STATS (Add to users table)
+-- ============================================================================
+
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS rating_average DECIMAL(3,2) DEFAULT 0.00,
+ADD COLUMN IF NOT EXISTS rating_count INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS reviews_as_seller INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS reviews_as_buyer INTEGER DEFAULT 0;
+
+-- ============================================================================
+-- 5. FUNCTIONS
+-- ============================================================================
+
+-- Function to create transaction and notifications
+CREATE OR REPLACE FUNCTION create_transaction_with_notifications(
+  p_listing_id UUID,
+  p_seller_id UUID,
+  p_buyer_id UUID
+)
+RETURNS UUID AS $$
+DECLARE
+  v_transaction_id UUID;
+  v_listing_title TEXT;
+BEGIN
+  -- Get listing title
+  SELECT title INTO v_listing_title FROM listings WHERE id = p_listing_id;
+  
+  -- Create transaction
+  INSERT INTO transactions (listing_id, seller_id, buyer_id)
+  VALUES (p_listing_id, p_seller_id, p_buyer_id)
+  RETURNING id INTO v_transaction_id;
+  
+  -- Create notification for seller
+  INSERT INTO notifications (user_id, type, title, message, data)
+  VALUES (
+    p_seller_id,
+    'rating_request',
+    'Évaluez votre acheteur',
+    'Évaluez votre expérience avec l''acheteur de "' || v_listing_title || '"',
+    jsonb_build_object(
+      'transaction_id', v_transaction_id,
+      'listing_id', p_listing_id,
+      'other_user_id', p_buyer_id
+    )
+  );
+  
+  -- Create notification for buyer
+  INSERT INTO notifications (user_id, type, title, message, data)
+  VALUES (
+    p_buyer_id,
+    'rating_request',
+    'Évaluez votre vendeur',
+    'Évaluez votre expérience avec le vendeur de "' || v_listing_title || '"',
+    jsonb_build_object(
+      'transaction_id', v_transaction_id,
+      'listing_id', p_listing_id,
+      'other_user_id', p_seller_id
+    )
+  );
+  
+  RETURN v_transaction_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to submit review and update stats
+CREATE OR REPLACE FUNCTION submit_review(
+  p_transaction_id UUID,
+  p_reviewer_id UUID,
+  p_reviewee_id UUID,
+  p_listing_id UUID,
+  p_rating INTEGER,
+  p_comment TEXT
+)
+RETURNS VOID AS $$
+DECLARE
+  v_is_seller BOOLEAN;
+  v_transaction_status TEXT;
+  v_other_rated BOOLEAN;
+BEGIN
+  -- Check if reviewer is the seller
+  SELECT 
+    seller_id = p_reviewer_id,
+    status,
+    CASE 
+      WHEN seller_id = p_reviewer_id THEN buyer_rated
+      ELSE seller_rated
+    END
+  INTO v_is_seller, v_transaction_status, v_other_rated
+  FROM transactions
+  WHERE id = p_transaction_id;
+  
+  -- Insert review
+  INSERT INTO reviews (transaction_id, reviewer_id, reviewee_id, listing_id, rating, comment)
+  VALUES (p_transaction_id, p_reviewer_id, p_reviewee_id, p_listing_id, p_rating, p_comment);
+  
+  -- Update transaction rated status
+  IF v_is_seller THEN
+    UPDATE transactions SET seller_rated = TRUE WHERE id = p_transaction_id;
+  ELSE
+    UPDATE transactions SET buyer_rated = TRUE WHERE id = p_transaction_id;
+  END IF;
+  
+  -- Update reviewee stats
+  UPDATE users
+  SET 
+    rating_count = rating_count + 1,
+    rating_average = (
+      SELECT ROUND(AVG(rating)::numeric, 2)
+      FROM reviews
+      WHERE reviewee_id = p_reviewee_id
+    ),
+    reviews_as_seller = (
+      SELECT COUNT(*)
+      FROM reviews r
+      JOIN transactions t ON r.transaction_id = t.id
+      WHERE r.reviewee_id = p_reviewee_id AND t.seller_id = p_reviewee_id
+    ),
+    reviews_as_buyer = (
+      SELECT COUNT(*)
+      FROM reviews r
+      JOIN transactions t ON r.transaction_id = t.id
+      WHERE r.reviewee_id = p_reviewee_id AND t.buyer_id = p_reviewee_id
+    )
+  WHERE id = p_reviewee_id;
+  
+  -- Create notification for reviewee
+  INSERT INTO notifications (user_id, type, title, message, data)
+  VALUES (
+    p_reviewee_id,
+    'rating_received',
+    'Nouvelle évaluation',
+    'Quelqu''un vous a évalué ' || p_rating || ' étoile' || CASE WHEN p_rating > 1 THEN 's' ELSE '' END,
+    jsonb_build_object(
+      'transaction_id', p_transaction_id,
+      'rating', p_rating,
+      'reviewer_id', p_reviewer_id
+    )
+  );
+  
+  -- If both rated, mark transaction as completed
+  IF v_other_rated THEN
+    UPDATE transactions 
+    SET status = 'completed', completed_at = NOW()
+    WHERE id = p_transaction_id;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get unread notification count
+CREATE OR REPLACE FUNCTION get_unread_notification_count(p_user_id UUID)
+RETURNS INTEGER AS $$
+BEGIN
+  RETURN (
+    SELECT COUNT(*)::INTEGER
+    FROM notifications
+    WHERE user_id = p_user_id AND read = FALSE
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to mark notifications as read
+CREATE OR REPLACE FUNCTION mark_notifications_read(
+  p_user_id UUID,
+  p_notification_ids UUID[]
+)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE notifications
+  SET read = TRUE
+  WHERE user_id = p_user_id
+    AND id = ANY(p_notification_ids)
+    AND read = FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to update review timestamp
+CREATE OR REPLACE FUNCTION update_review_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger for review updates
+CREATE TRIGGER trigger_update_review_timestamp
+BEFORE UPDATE ON reviews
+FOR EACH ROW
+EXECUTE FUNCTION update_review_timestamp();
+
+-- ============================================================================
+-- 6. ROW LEVEL SECURITY
+-- ============================================================================
+
+-- Enable RLS
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- Transactions policies
+DROP POLICY IF EXISTS "Users can view their own transactions" ON transactions;
+CREATE POLICY "Users can view their own transactions"
+  ON transactions FOR SELECT
+  USING (auth.uid() = seller_id OR auth.uid() = buyer_id);
+
+DROP POLICY IF EXISTS "Users can insert transactions" ON transactions;
+CREATE POLICY "Users can insert transactions"
+  ON transactions FOR INSERT
+  WITH CHECK (auth.uid() = seller_id);
+
+-- Reviews policies
+DROP POLICY IF EXISTS "Anyone can view reviews" ON reviews;
+CREATE POLICY "Anyone can view reviews"
+  ON reviews FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Users can insert their own reviews" ON reviews;
+CREATE POLICY "Users can insert their own reviews"
+  ON reviews FOR INSERT
+  WITH CHECK (auth.uid() = reviewer_id);
+
+-- Notifications policies
+DROP POLICY IF EXISTS "Users can view their own notifications" ON notifications;
+CREATE POLICY "Users can view their own notifications"
+  ON notifications FOR SELECT
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own notifications" ON notifications;
+CREATE POLICY "Users can update their own notifications"
+  ON notifications FOR UPDATE
+  USING (auth.uid() = user_id);
+
+-- ============================================================================
+-- DONE!
+-- ============================================================================

@@ -22,9 +22,9 @@ import {
   Heart,
   Sparkles,
   X,
-  Bell,
   SlidersHorizontal
 } from 'lucide-react-native';
+import NotificationBell from '@/components/NotificationBell';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
@@ -376,9 +376,7 @@ export default function HomeScreen() {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
-            <Bell size={24} color="#1e293b" strokeWidth={2} />
-          </TouchableOpacity>
+          <NotificationBell />
         </View>
       </View>
 

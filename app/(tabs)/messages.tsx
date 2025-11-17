@@ -14,13 +14,14 @@ View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { MessageCircle, Bell, Search, Trash2 } from 'lucide-react-native';
+import { MessageCircle, Search, Trash2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/contexts/MessagesContext';
 import { Conversation } from '@/types/chat';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
+import NotificationBell from '@/components/NotificationBell';
 
 export default function MessagesScreen() {
   const { user } = useAuth();
@@ -671,9 +672,7 @@ export default function MessagesScreen() {
               resizeMode="contain"
             />
             <View style={styles.headerIcons}>
-              <TouchableOpacity style={styles.iconButton}>
-                <Bell size={24} color="#1e293b" strokeWidth={2} />
-              </TouchableOpacity>
+              <NotificationBell />
             </View>
           </View>
           <View style={styles.emptyContainer}>
@@ -705,9 +704,7 @@ export default function MessagesScreen() {
               resizeMode="contain"
             />
             <View style={styles.headerIcons}>
-              <TouchableOpacity style={styles.iconButton}>
-                <Bell size={24} color="#1e293b" strokeWidth={2} />
-              </TouchableOpacity>
+              <NotificationBell />
             </View>
           </View>
           <View style={styles.loadingContainer}>
@@ -729,9 +726,7 @@ export default function MessagesScreen() {
             resizeMode="contain"
           />
           <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Bell size={24} color="#1e293b" strokeWidth={2} />
-            </TouchableOpacity>
+            <NotificationBell />
           </View>
         </View>
 
@@ -780,6 +775,16 @@ export default function MessagesScreen() {
             />
           </View>
         </View>
+
+        {/* Safety Tip Banner */}
+        {conversations.length > 0 && (
+          <View style={styles.safetyTipBanner}>
+            <Text style={styles.safetyTipIcon}>🛡️</Text>
+            <Text style={styles.safetyTipText}>
+              <Text style={styles.safetyTipBold}>Rappel:</Text> Ne payez jamais avant d'avoir vu le produit en personne.
+            </Text>
+          </View>
+        )}
 
         {conversations.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -888,6 +893,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#000',
     padding: 0,
+  },
+  safetyTipBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ecfdf5',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    gap: 10,
+  },
+  safetyTipIcon: {
+    fontSize: 18,
+  },
+  safetyTipText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#065f46',
+    lineHeight: 16,
+  },
+  safetyTipBold: {
+    fontWeight: '700',
+    color: '#064e3b',
   },
   loadingContainer: {
     flex: 1,

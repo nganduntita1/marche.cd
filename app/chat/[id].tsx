@@ -13,12 +13,13 @@ View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Send } from 'lucide-react-native';
+import { ArrowLeft, Send, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/contexts/MessagesContext';
 import { Message, Conversation } from '@/types/chat';
 import Colors from '@/constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams();
@@ -30,6 +31,7 @@ export default function ChatScreen() {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [showSafetyBanner, setShowSafetyBanner] = useState(true);
   const flatListRef = useRef<FlatList>(null);
   // track optimistic messages to reconcile with server responses
   const optimisticRef = useRef<Record<string, boolean>>({});
@@ -44,6 +46,7 @@ export default function ChatScreen() {
     if (id && user) {
       loadConversation();
       loadMessages();
+      loadSafetyBannerState();
       const cleanup = subscribeToMessages();
       startPollingForNewMessages();
       
@@ -59,6 +62,26 @@ export default function ChatScreen() {
       };
     }
   }, [id, user]);
+
+  const loadSafetyBannerState = async () => {
+    try {
+      const dismissed = await AsyncStorage.getItem(`safety_banner_dismissed_${id}`);
+      if (dismissed === 'true') {
+        setShowSafetyBanner(false);
+      }
+    } catch (error) {
+      console.error('Error loading safety banner state:', error);
+    }
+  };
+
+  const dismissSafetyBanner = async () => {
+    try {
+      await AsyncStorage.setItem(`safety_banner_dismissed_${id}`, 'true');
+      setShowSafetyBanner(false);
+    } catch (error) {
+      console.error('Error saving safety banner state:', error);
+    }
+  };
 
   const markMessagesAsRead = async () => {
     if (!user || !id) return;
@@ -585,6 +608,23 @@ export default function ChatScreen() {
         </TouchableOpacity>
       )}
 
+      {/* Safety Warning Banner */}
+      {showSafetyBanner && (
+        <View style={styles.safetyBanner}>
+          <Text style={styles.safetyBannerIcon}>⚠️</Text>
+          <Text style={styles.safetyBannerText}>
+            <Text style={styles.safetyBannerBold}>Ne payez jamais avant d'avoir vu le produit.</Text> Rencontrez-vous en personne dans un lieu public.
+          </Text>
+          <TouchableOpacity 
+            onPress={dismissSafetyBanner}
+            style={styles.safetyBannerClose}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <X size={18} color="#92400e" strokeWidth={2.5} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       <KeyboardAvoidingView
         style={styles.chatContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -741,15 +781,39 @@ const styles = StyleSheet.create({
     color: '#22c55e',
   },
   listingPreviewArrow: {
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingLeft: 8,
   },
   listingPreviewArrowText: {
-    fontSize: 28,
+    fontSize: 24,
+    color: '#c7c7cc',
     fontWeight: '300',
-    color: '#8e8e93',
+  },
+  safetyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fde68a',
+    gap: 10,
+  },
+  safetyBannerIcon: {
+    fontSize: 20,
+  },
+  safetyBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400e',
+    lineHeight: 18,
+  },
+  safetyBannerBold: {
+    fontWeight: '700',
+    color: '#78350f',
+  },
+  safetyBannerClose: {
+    padding: 4,
+    marginLeft: 4,
   },
   chatContainer: {
     flex: 1,

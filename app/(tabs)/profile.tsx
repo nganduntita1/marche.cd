@@ -34,6 +34,9 @@ export default function ProfileScreen() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [ratingAverage, setRatingAverage] = useState(0);
+  const [ratingCount, setRatingCount] = useState(0);
 
   const fetchUserListings = async () => {
     try {
@@ -112,10 +115,47 @@ export default function ProfileScreen() {
     setRefreshing(false);
   };
 
+  const loadNotificationCount = async () => {
+    try {
+      if (!user) return;
+      
+      const { data, error } = await supabase.rpc('get_unread_notification_count', {
+        p_user_id: user.id
+      });
+      
+      if (!error && typeof data === 'number') {
+        setNotificationCount(data);
+      }
+    } catch (error) {
+      console.error('Error loading notification count:', error);
+    }
+  };
+
+  const loadUserRatings = async () => {
+    try {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('users')
+        .select('rating_average, rating_count')
+        .eq('id', user.id)
+        .single();
+      
+      if (!error && data) {
+        setRatingAverage(data.rating_average || 0);
+        setRatingCount(data.rating_count || 0);
+      }
+    } catch (error) {
+      console.error('Error loading user ratings:', error);
+    }
+  };
+
   useEffect(() => {
     if (user?.id) {
       fetchUserListings();
       fetchUserCredits();
+      loadNotificationCount();
+      loadUserRatings();
 
       // Set up real-time subscription for user's listings
       const listingsSubscription = supabase
@@ -184,8 +224,18 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
           <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={() => router.push('/notifications')}
+            >
               <Bell size={24} color="#1e293b" strokeWidth={2} />
+              {notificationCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -225,8 +275,18 @@ export default function ProfileScreen() {
           >
             <BarChart3 size={24} color={Colors.primary} strokeWidth={2} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => router.push('/notifications')}
+          >
             <Bell size={24} color="#1e293b" strokeWidth={2} />
+            {notificationCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {notificationCount > 99 ? '99+' : notificationCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.iconButton}
@@ -273,7 +333,12 @@ export default function ProfileScreen() {
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Star size={14} color="#f59e0b" fill="#f59e0b" />
-                <Text style={styles.statValue}>4.8</Text>
+                <Text style={styles.statValue}>
+                  {ratingCount > 0 ? ratingAverage.toFixed(1) : 'Nouveau'}
+                </Text>
+                {ratingCount > 0 && (
+                  <Text style={styles.statLabel}>({ratingCount})</Text>
+                )}
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
@@ -470,6 +535,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  notificationBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#fff',
   },
 
   profileCard: {
@@ -541,6 +625,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#1e293b',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    marginLeft: 2,
   },
   statDivider: {
     width: 1,

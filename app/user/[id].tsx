@@ -36,6 +36,7 @@ type Rating = {
   created_at: string;
   rater: {
     name: string;
+    profile_picture?: string;
   };
 };
 
@@ -58,11 +59,6 @@ export default function UserProfileScreen() {
   const [averageRating, setAverageRating] = useState(0);
   const [totalRatings, setTotalRatings] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [showRatingForm, setShowRatingForm] = useState(false);
-  const [newRating, setNewRating] = useState(0);
-  const [newComment, setNewComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [userRating, setUserRating] = useState<Rating | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -84,13 +80,10 @@ export default function UserProfileScreen() {
       if (error) throw error;
       setProfile(data);
 
-      // Get average rating
-      const { data: ratingData } = await supabase
-        .rpc('get_user_rating', { user_uuid: id });
-
-      if (ratingData && ratingData.length > 0) {
-        setAverageRating(parseFloat(ratingData[0].average_rating) || 0);
-        setTotalRatings(parseInt(ratingData[0].total_ratings) || 0);
+      // Get rating stats from user table (updated by submit_review function)
+      if (data) {
+        setAverageRating(data.rating_average || 0);
+        setTotalRatings(data.rating_count || 0);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -102,26 +95,38 @@ export default function UserProfileScreen() {
   const loadRatings = async () => {
     try {
       const { data, error } = await supabase
-        .from('ratings')
+        .from('reviews')
         .select(`
-          *,
-          rater:users!ratings_rated_by_fkey(name)
+          id,
+          rating,
+          comment,
+          created_at,
+          reviewer_id,
+          reviewer:reviewer_id (
+            id,
+            name,
+            profile_picture
+          )
         `)
-        .eq('user_id', id)
+        .eq('reviewee_id', id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setRatings(data || []);
-
-      // Check if current user has rated
-      if (user) {
-        const myRating = data?.find((r) => r.rated_by === user.id);
-        setUserRating(myRating || null);
-        if (myRating) {
-          setNewRating(myRating.rating);
-          setNewComment(myRating.comment || '');
-        }
-      }
+      
+      // Transform data to match Rating type
+      const transformedRatings = (data || []).map((review: any) => ({
+        id: review.id,
+        rating: review.rating,
+        comment: review.comment,
+        rated_by: review.reviewer_id,
+        created_at: review.created_at,
+        rater: {
+          name: review.reviewer?.name || 'Utilisateur',
+          profile_picture: review.reviewer?.profile_picture,
+        },
+      }));
+      
+      setRatings(transformedRatings);
     } catch (error) {
       console.error('Error loading ratings:', error);
     }
@@ -143,6 +148,15 @@ export default function UserProfileScreen() {
   };
 
   const submitRating = async () => {
+    // Ratings are now only submitted through transactions
+    Alert.alert(
+      'Évaluations via transactions',
+      'Vous pouvez évaluer un utilisateur après avoir effectué une transaction avec lui. Marquez une annonce comme vendue pour créer une transaction.',
+      [{ text: 'OK' }]
+    );
+    return;
+
+    /* OLD RATING SYSTEM - DISABLED
     if (!user) {
       Alert.alert('Connexion requise', 'Connectez-vous pour noter cet utilisateur');
       return;
@@ -194,23 +208,20 @@ export default function UserProfileScreen() {
     } finally {
       setSubmitting(false);
     }
+    */
   };
 
-  const renderStars = (rating: number, size: number = 20, interactive: boolean = false) => {
+  const renderStars = (rating: number, size: number = 20) => {
     return (
       <View style={styles.starsContainer}>
         {[1, 2, 3, 4, 5].map((star) => (
-          <TouchableOpacity
-            key={star}
-            onPress={() => interactive && setNewRating(star)}
-            disabled={!interactive}
-          >
+          <View key={star}>
             <Star
               size={size}
               color="#fbbf24"
               fill={star <= rating ? '#fbbf24' : 'transparent'}
             />
-          </TouchableOpacity>
+          </View>
         ))}
       </View>
     );
@@ -277,60 +288,15 @@ export default function UserProfileScreen() {
           <View style={styles.ratingContainer}>
             {renderStars(averageRating, 24)}
             <Text style={styles.ratingText}>
-              {averageRating.toFixed(1)} ({totalRatings} {totalRatings === 1 ? 'avis' : 'avis'})
+              {averageRating > 0 
+                ? `${averageRating.toFixed(1)} (${totalRatings} ${totalRatings === 1 ? 'avis' : 'avis'})`
+                : 'Aucune évaluation'
+              }
             </Text>
           </View>
-
-          {user && user.id !== id && (
-            <TouchableOpacity
-              style={styles.rateButton}
-              onPress={() => setShowRatingForm(!showRatingForm)}
-            >
-              <Text style={styles.rateButtonText}>
-                {userRating ? 'Modifier ma note' : 'Noter cet utilisateur'}
-              </Text>
-            </TouchableOpacity>
-          )}
         </View>
 
-        {showRatingForm && (
-          <View style={styles.ratingForm}>
-            <Text style={styles.formTitle}>Votre note</Text>
-            {renderStars(newRating, 32, true)}
-            
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Commentaire (optionnel)"
-              placeholderTextColor="#94a3b8"
-              value={newComment}
-              onChangeText={setNewComment}
-              multiline
-              maxLength={500}
-            />
-
-            <View style={styles.formButtons}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  setShowRatingForm(false);
-                  setNewRating(userRating?.rating || 0);
-                  setNewComment(userRating?.comment || '');
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-                onPress={submitRating}
-                disabled={submitting}
-              >
-                <Text style={styles.submitButtonText}>
-                  {submitting ? 'Envoi...' : 'Envoyer'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+        {/* Rating form removed - ratings only through transactions */}
 
         <View style={styles.listingsSection}>
           <Text style={styles.sectionTitle}>Annonces ({listings.length})</Text>

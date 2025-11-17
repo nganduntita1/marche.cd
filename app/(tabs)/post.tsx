@@ -20,12 +20,13 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { supabase } from '@/lib/supabase';
 import Popup from '@/components/Popup';
-import { Bell, Camera, FileText, Tag, DollarSign, X, Check, MapPin, Navigation } from 'lucide-react-native';
+import { Camera, FileText, Tag, DollarSign, X, Check, MapPin, Navigation } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
 import { useLocation } from '@/contexts/LocationContext';
 import { getCurrentLocation, getCityFromCoordinates } from '@/services/locationService';
 import CityPickerModal from '@/components/CityPickerModal';
+import NotificationBell from '@/components/NotificationBell';
 
 export default function PostScreen() {
   const { user } = useAuth();
@@ -277,9 +278,7 @@ export default function PostScreen() {
           <View style={styles.header}>
             <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
             <View style={styles.headerIcons}>
-              <TouchableOpacity style={styles.iconButton}>
-                <Bell size={24} color="#1e293b" strokeWidth={2} />
-              </TouchableOpacity>
+              <NotificationBell />
             </View>
           </View>
         
@@ -320,9 +319,7 @@ export default function PostScreen() {
           <View style={styles.header}>
             <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
             <View style={styles.headerIcons}>
-              <TouchableOpacity style={styles.iconButton}>
-                <Bell size={24} color="#1e293b" strokeWidth={2} />
-              </TouchableOpacity>
+              <NotificationBell />
             </View>
           </View>
         
@@ -367,9 +364,7 @@ export default function PostScreen() {
         <View style={styles.header}>
           <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
           <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Bell size={24} color="#1e293b" strokeWidth={2} />
-            </TouchableOpacity>
+            <NotificationBell />
           </View>
         </View>
         
