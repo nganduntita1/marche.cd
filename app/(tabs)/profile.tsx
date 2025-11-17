@@ -15,7 +15,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import ListingCard from '@/components/ListingCard';
 import CreditCard from '@/components/CreditCard';
-import { Bell, MapPin, Phone, Mail, Star, Package, Settings } from 'lucide-react-native';
+import { Bell, MapPin, Phone, Mail, Star, Package, Settings, BarChart3 } from 'lucide-react-native';
+import Colors from '@/constants/Colors';
+import { TextStyles } from '@/constants/Typography';
 
 type Listing = {
   id: string;
@@ -217,6 +219,12 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
         <View style={styles.headerIcons}>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => router.push('/seller-dashboard')}
+          >
+            <BarChart3 size={24} color={Colors.primary} strokeWidth={2} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton}>
             <Bell size={24} color="#1e293b" strokeWidth={2} />
           </TouchableOpacity>
@@ -235,8 +243,8 @@ export default function ProfileScreen() {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          colors={['#9bbd1f']}
-          tintColor="#9bbd1f"
+          colors={[Colors.primary]}
+          tintColor={Colors.primary}
         />
       }
       showsVerticalScrollIndicator={false}
@@ -278,10 +286,6 @@ export default function ProfileScreen() {
 
         <View style={styles.infoSection}>
           <View style={styles.infoItem}>
-            <Mail size={18} color="#64748b" />
-            <Text style={styles.infoText}>{user.email}</Text>
-          </View>
-          <View style={styles.infoItem}>
             <Phone size={18} color="#64748b" />
             <Text style={styles.infoText}>{user.phone || 'Aucun numéro'}</Text>
           </View>
@@ -289,6 +293,20 @@ export default function ProfileScreen() {
             <MapPin size={18} color="#64748b" />
             <Text style={styles.infoText}>{user.location || 'Aucune ville'}</Text>
           </View>
+        </View>
+
+        <View style={styles.loginCredentialsBanner}>
+          <View style={styles.credentialsHeader}>
+            <Text style={styles.credentialsIcon}>🔐</Text>
+            <Text style={styles.credentialsTitle}>IMPORTANT - Notez vos identifiants</Text>
+          </View>
+          <View style={styles.credentialItem}>
+            <Text style={styles.credentialLabel}>Email de connexion:</Text>
+            <Text style={styles.credentialValue}>{user.email}</Text>
+          </View>
+          <Text style={styles.credentialsWarning}>
+            ⚠️ Écrivez ces informations quelque part pour pouvoir vous reconnecter plus tard
+          </Text>
         </View>
 
         <View style={styles.creditBanner}>
@@ -491,7 +509,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -618,7 +636,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   modernActionButton: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
@@ -695,7 +713,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   newListingButton: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
@@ -739,11 +757,11 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   emptyStateButton: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingVertical: 16,
     paddingHorizontal: 40,
     borderRadius: 12,
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -795,7 +813,7 @@ const styles = StyleSheet.create({
 
   // Button styles
   button: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -804,5 +822,53 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+
+  // Login credentials banner
+  loginCredentialsBanner: {
+    backgroundColor: '#fee2e2',
+    padding: 18,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#ef4444',
+  },
+  credentialsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+  },
+  credentialsIcon: {
+    fontSize: 20,
+  },
+  credentialsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#991b1b',
+    flex: 1,
+  },
+  credentialItem: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  credentialLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#991b1b',
+    marginBottom: 4,
+  },
+  credentialValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  credentialsWarning: {
+    fontSize: 13,
+    color: '#991b1b',
+    fontWeight: '600',
+    lineHeight: 18,
   },
 });

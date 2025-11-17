@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  View,
+View,
   Text,
   StyleSheet,
   TouchableOpacity,
@@ -10,6 +10,8 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sparkles } from 'lucide-react-native';
+import Colors from '@/constants/Colors';
+import { TextStyles } from '@/constants/Typography';
 
 type CreditCardProps = {
   credits: number;
@@ -103,9 +105,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardPopular: {
-    borderColor: '#9bbd1f',
+    borderColor: Colors.primary,
     backgroundColor: '#f0fdf4',
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOpacity: 0.15,
     elevation: 4,
   },
@@ -113,14 +115,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -10,
     right: 20,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -154,7 +156,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 36,
     fontWeight: '700',
-    color: '#9bbd1f',
+    color: Colors.primary,
     marginBottom: 8,
   },
   perCreditBadge: {
@@ -169,7 +171,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   button: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 12,

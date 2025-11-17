@@ -43,8 +43,13 @@ export interface Listing {
   images: string[];
   seller_id: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   condition: ListingCondition;
   is_featured: boolean;
+  is_promoted?: boolean;
+  promoted_until?: string;
+  views_count?: number;
   status: ListingStatus;
   created_at: string;
   updated_at: string;

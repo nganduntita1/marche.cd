@@ -1,0 +1,78 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+const filesToUpdate = [
+  'app/auth/register.tsx',
+  'app/auth/login.tsx',
+  'app/auth/complete-profile.tsx',
+  'app/(tabs)/profile.tsx',
+  'app/(tabs)/index.tsx',
+  'app/(tabs)/post.tsx',
+  'app/(tabs)/messages.tsx',
+  'app/settings.tsx',
+  'app/favorites.tsx',
+  'app/edit-profile.tsx',
+  'app/listing/[id].tsx',
+  'app/user/[id].tsx',
+  'components/ListingCard.tsx',
+  'components/CreditCard.tsx',
+];
+
+const importStatement = "import { TextStyles } from '@/constants/Typography';";
+
+filesToUpdate.forEach(filePath => {
+  try {
+    const fullPath = path.join(process.cwd(), filePath);
+    
+    if (!fs.existsSync(fullPath)) {
+      console.log(`⚠️  File not found: ${filePath}`);
+      return;
+    }
+
+    let content = fs.readFileSync(fullPath, 'utf8');
+    
+    // Check if import already exists
+    if (content.includes(importStatement)) {
+      console.log(`✓ Already has import: ${filePath}`);
+      return;
+    }
+    
+    // Find the last import statement
+    const lines = content.split('\n');
+    let lastImportIndex = -1;
+    let inMultilineImport = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      if (line.startsWith('import ')) {
+        lastImportIndex = i;
+        if (line.includes('{') && !line.includes('}')) {
+          inMultilineImport = true;
+        }
+      } else if (inMultilineImport && line.includes('}')) {
+        lastImportIndex = i;
+        inMultilineImport = false;
+      } else if (inMultilineImport) {
+        lastImportIndex = i;
+      }
+    }
+    
+    if (lastImportIndex !== -1) {
+      lines.splice(lastImportIndex + 1, 0, importStatement);
+      content = lines.join('\n');
+      
+      fs.writeFileSync(fullPath, content, 'utf8');
+      console.log(`✅ Added Typography import to: ${filePath}`);
+    } else {
+      console.log(`⚠️  Could not find import section: ${filePath}`);
+    }
+    
+  } catch (error) {
+    console.error(`❌ Error processing ${filePath}:`, error.message);
+  }
+});
+
+console.log('\n✨ Typography imports added! Now applying font styles...\n');

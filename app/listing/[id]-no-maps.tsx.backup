@@ -1,0 +1,94 @@
+/**
+ * ALTERNATIVE VERSION: Listing Detail WITHOUT react-native-maps
+ * 
+ * This version shows location and distance without requiring Google Maps API
+ * Use this if you want to avoid the complexity of setting up maps
+ * 
+ * To use this version:
+ * 1. Rename this file to [id].tsx
+ * 2. Backup the current [id].tsx
+ * 3. Remove the MapView import and component
+ */
+
+// In the location section, replace the MapView with this simpler version:
+
+<View style={styles.section}>
+  <Text style={styles.sectionTitle}>Localisation</Text>
+  
+  <View style={styles.locationInfo}>
+    <View style={styles.locationRow}>
+      <MapPin size={20} color={Colors.primary} />
+      <View style={styles.locationTextContainer}>
+        <Text style={styles.locationCity}>{listing.location}</Text>
+        {userLocation && listing.latitude && listing.longitude && (
+          <Text style={styles.locationDistance}>
+            À {formatDistance(calculateDistance(
+              userLocation.latitude,
+              userLocation.longitude,
+              listing.latitude,
+              listing.longitude
+            ))} de vous
+          </Text>
+        )}
+      </View>
+    </View>
+    
+    {/* Static location indicator */}
+    {listing.latitude && listing.longitude && (
+      <View style={styles.staticMapPlaceholder}>
+        <View style={styles.mapPinIcon}>
+          <MapPin size={32} color={Colors.primary} />
+        </View>
+        <Text style={styles.staticMapText}>
+          📍 Zone: {listing.location}
+        </Text>
+        <Text style={styles.staticMapSubtext}>
+          L'emplacement exact sera partagé après contact
+        </Text>
+      </View>
+    )}
+  </View>
+</View>
+
+// Add these styles:
+
+const styles = StyleSheet.create({
+  // ... existing styles ...
+  
+  staticMapPlaceholder: {
+    marginTop: 16,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    borderStyle: 'dashed',
+  },
+  mapPinIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  staticMapText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  staticMapSubtext: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+});

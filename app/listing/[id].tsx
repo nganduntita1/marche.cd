@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View,
+View,
   Text,
   Image,
   TouchableOpacity,
@@ -11,20 +11,30 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, MapPin, MessageCircle, Calendar, Tag, ChevronLeft, ChevronRight, X, Heart, Star, ThumbsUp } from 'lucide-react-native';
+import { ArrowLeft, MapPin, MessageCircle, Calendar, Tag, ChevronLeft, ChevronRight, X, Heart, Star, ThumbsUp, DollarSign, Share2, Sparkles } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ListingWithDetails } from '@/types/database';
 
 const { width } = Dimensions.get('window');
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from '@/contexts/LocationContext';
+import { calculateDistance, formatDistance } from '@/services/locationService';
+import Colors from '@/constants/Colors';
+import { TextStyles } from '@/constants/Typography';
+import SafetyTipsModal from '@/components/SafetyTipsModal';
+import ShareModal from '@/components/ShareModal';
+import PromoteModal from '@/components/PromoteModal';
+import { Platform } from 'react-native';
 
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { userLocation } = useLocation();
   const [listing, setListing] = useState<ListingWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -32,8 +42,15 @@ export default function ListingDetailScreen() {
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageIndex, setModalImageIndex] = useState(0);
   const [showSafetyGuide, setShowSafetyGuide] = useState(false);
+  const [showSafetyTipsModal, setShowSafetyTipsModal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [customMessage, setCustomMessage] = useState('');
+  const [showCustomMessageModal, setShowCustomMessageModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showPromoteModal, setShowPromoteModal] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -138,9 +155,9 @@ export default function ListingDetailScreen() {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('fr-CD', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'CDF',
+      currency: 'USD',
       minimumFractionDigits: 0,
     }).format(price);
   };
@@ -210,11 +227,122 @@ export default function ListingDetailScreen() {
     return labels[condition] || condition;
   };
 
+  const handleQuickMessage = async (messageText: string) => {
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
+
+    // Check if conversation exists
+    const { data: existingConv } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('listing_id', listing?.id)
+      .eq('buyer_id', user.id)
+      .maybeSingle();
+
+    // Show safety tips for first-time conversations
+    if (!existingConv) {
+      setShowSafetyTipsModal(true);
+      return;
+    }
+
+    // If conversation exists, send message and navigate
+    await sendQuickMessage(existingConv.id, messageText);
+    router.push(`/chat/${existingConv.id}`);
+  };
+
+  const sendQuickMessage = async (conversationId: string, messageText: string) => {
+    try {
+      await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: user?.id,
+          content: messageText,
+        });
+    } catch (error) {
+      console.error('Error sending quick message:', error);
+    }
+  };
+
+  const proceedToChat = async (initialMessage?: string) => {
+    setShowSafetyTipsModal(false);
+    
+    try {
+      // Create new conversation
+      const { data: newConv, error } = await supabase
+        .from('conversations')
+        .insert({
+          listing_id: listing?.id,
+          buyer_id: user?.id,
+          seller_id: listing?.seller_id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Send initial message if provided
+      if (initialMessage) {
+        await sendQuickMessage(newConv.id, initialMessage);
+      }
+
+      router.push(`/chat/${newConv.id}`);
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+      Alert.alert('Erreur', 'Impossible de créer la conversation');
+    }
+  };
+
+  const handleIsAvailable = () => {
+    const message = `Bonjour! Est-ce que "${listing?.title}" est toujours disponible?`;
+    handleQuickMessage(message);
+  };
+
+  const handleMakeOffer = () => {
+    setShowOfferModal(true);
+  };
+
+  const submitOffer = () => {
+    if (!offerAmount.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un montant');
+      return;
+    }
+
+    const amount = parseFloat(offerAmount.replace(/[^0-9.]/g, ''));
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Erreur', 'Montant invalide');
+      return;
+    }
+
+    const message = `Bonjour! Je suis intéressé par "${listing?.title}". Seriez-vous d'accord pour ${formatPrice(amount)}?`;
+    setShowOfferModal(false);
+    setOfferAmount('');
+    handleQuickMessage(message);
+  };
+
+  const handleCustomMessage = () => {
+    setShowCustomMessageModal(true);
+  };
+
+  const submitCustomMessage = () => {
+    if (!customMessage.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un message');
+      return;
+    }
+
+    setShowCustomMessageModal(false);
+    const message = customMessage;
+    setCustomMessage('');
+    handleQuickMessage(message);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#9bbd1f" />
+          <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.loadingText}>Chargement...</Text>
         </View>
       </SafeAreaView>
@@ -247,32 +375,17 @@ export default function ListingDetailScreen() {
       <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.imageContainer}>
-          <ScrollView
-            ref={scrollViewRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onScroll={event => {
-              const index = Math.round(
-                event.nativeEvent.contentOffset.x / width
-              );
-              setActiveImageIndex(index);
-            }}
-            scrollEventThrottle={16}
+          {/* Main Image Display */}
+          <TouchableOpacity
+            onPress={() => openImageModal(activeImageIndex)}
+            activeOpacity={0.9}
           >
-            {images.map((imageUrl, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={() => openImageModal(index)}
-                activeOpacity={0.9}
-              >
-                <Image
-                  source={{ uri: imageUrl }}
-                  style={styles.image}
-                />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+            <Image
+              source={{ uri: images[activeImageIndex] }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.backButton}
@@ -281,34 +394,51 @@ export default function ListingDetailScreen() {
             <ArrowLeft size={20} color="#1e293b" />
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.shareButton}
+            onPress={() => setShowShareModal(true)}
+          >
+            <Share2 size={20} color="#1e293b" />
+          </TouchableOpacity>
+
+          {/* Image Counter Badge */}
           {images.length > 1 && (
-            <>
-              <TouchableOpacity
-                style={styles.navButtonLeft}
-                onPress={() => navigateMainGallery('prev')}
-              >
-                <ChevronLeft size={24} color="#fff" />
-              </TouchableOpacity>
+            <View style={styles.imageCountBadge}>
+              <Text style={styles.imageCountText}>
+                {activeImageIndex + 1} / {images.length}
+              </Text>
+            </View>
+          )}
 
-              <TouchableOpacity
-                style={styles.navButtonRight}
-                onPress={() => navigateMainGallery('next')}
+          {/* Thumbnail Gallery */}
+          {images.length > 1 && (
+            <View style={styles.thumbnailContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.thumbnailScrollContent}
               >
-                <ChevronRight size={24} color="#fff" />
-              </TouchableOpacity>
-
-              <View style={styles.imageIndicator}>
-                {images.map((_, index) => (
-                  <View
+                {images.map((imageUrl, index) => (
+                  <TouchableOpacity
                     key={index}
+                    onPress={() => setActiveImageIndex(index)}
                     style={[
-                      styles.dot,
-                      index === activeImageIndex && styles.dotActive,
+                      styles.thumbnailWrapper,
+                      index === activeImageIndex && styles.thumbnailWrapperActive,
                     ]}
-                  />
+                  >
+                    <Image
+                      source={{ uri: imageUrl }}
+                      style={styles.thumbnail}
+                      resizeMode="cover"
+                    />
+                    {index === activeImageIndex && (
+                      <View style={styles.thumbnailOverlay} />
+                    )}
+                  </TouchableOpacity>
                 ))}
-              </View>
-            </>
+              </ScrollView>
+            </View>
           )}
         </View>
 
@@ -389,7 +519,7 @@ export default function ListingDetailScreen() {
               <Text style={styles.reviewsText}>120 Avis</Text>
             </View>
             <View style={styles.ratingItem}>
-              <ThumbsUp size={18} color="#9bbd1f" />
+              <ThumbsUp size={18} color={Colors.primary} />
               <Text style={styles.recommendText}>86%</Text>
               <Text style={styles.recommendSubtext}>(102) recommandent</Text>
             </View>
@@ -419,6 +549,68 @@ export default function ListingDetailScreen() {
                 {formatDate(listing.created_at)}
               </Text>
             </View>
+          </View>
+
+          <View style={styles.separator} />
+
+          {/* Location Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Localisation</Text>
+            
+            <View style={styles.locationInfo}>
+              <View style={styles.locationRow}>
+                <MapPin size={20} color={Colors.primary} />
+                <View style={styles.locationTextContainer}>
+                  <Text style={styles.locationCity}>{listing.location}</Text>
+                  {userLocation && listing.latitude && listing.longitude && (
+                    <Text style={styles.locationDistance}>
+                      À {formatDistance(calculateDistance(
+                        userLocation.latitude,
+                        userLocation.longitude,
+                        listing.latitude,
+                        listing.longitude
+                      ))} de vous
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {/* Map View - Web-friendly embedded map */}
+            {listing.latitude && listing.longitude && (
+              <View style={styles.mapContainer}>
+                {Platform.OS === 'web' ? (
+                  // Web: Use embedded Google Maps iframe
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0, borderRadius: 16 }}
+                    loading="lazy"
+                    src={`https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&center=${listing.latitude},${listing.longitude}&zoom=14&maptype=roadmap`}
+                  />
+                ) : (
+                  // Mobile: Show static map image or simple placeholder
+                  <Image
+                    source={{
+                      uri: `https://maps.googleapis.com/maps/api/staticmap?center=${listing.latitude},${listing.longitude}&zoom=14&size=600x300&markers=color:green%7C${listing.latitude},${listing.longitude}&key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8`
+                    }}
+                    style={styles.map}
+                    resizeMode="cover"
+                  />
+                )}
+                
+                {/* Green circle overlay to show approximate area */}
+                <View style={styles.circleOverlay}>
+                  <View style={styles.greenCircle} />
+                </View>
+                
+                <View style={styles.mapOverlay}>
+                  <Text style={styles.mapOverlayText}>
+                    📍 Zone approximative pour votre sécurité
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
 
           <View style={styles.separator} />
@@ -569,66 +761,87 @@ export default function ListingDetailScreen() {
 
       {user?.id === listing.seller_id ? (
         // Owner actions
-        <View style={styles.footer}>
-          <View style={styles.priceSection}>
-            <Text style={styles.footerPrice}>${listing.price.toLocaleString()}</Text>
-            <Text style={styles.deliveryText}>Votre annonce</Text>
+        <>
+          <View style={styles.ownerQuickActions}>
+            {!listing.is_promoted && listing.status === 'active' && (
+              <TouchableOpacity 
+                style={styles.promoteButtonQuick}
+                onPress={() => setShowPromoteModal(true)}
+              >
+                <Sparkles size={18} color="#fff" />
+                <Text style={styles.promoteButtonQuickText}>Promouvoir</Text>
+              </TouchableOpacity>
+            )}
+            {listing.is_promoted && (
+              <View style={styles.promotedIndicator}>
+                <Sparkles size={16} color="#fbbf24" />
+                <Text style={styles.promotedIndicatorText}>Annonce promue</Text>
+              </View>
+            )}
           </View>
-          
-          <TouchableOpacity 
-            style={styles.editButtonFooter} 
-            onPress={() => router.push(`/edit-listing/${id}`)}
-          >
-            <Text style={styles.editButtonText}>Modifier l'annonce</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.footer}>
+            <View style={styles.priceSection}>
+              <Text style={styles.footerPrice}>${listing.price.toLocaleString()}</Text>
+              <Text style={styles.deliveryText}>Votre annonce</Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.editButtonFooter} 
+              onPress={() => router.push(`/edit-listing/${id}`)}
+            >
+              <Text style={styles.editButtonText}>Modifier l'annonce</Text>
+            </TouchableOpacity>
+          </View>
+        </>
       ) : (
         // Buyer actions
-        <View style={styles.footer}>
-          <View style={styles.priceSection}>
-            <Text style={styles.footerPrice}>${listing.price.toLocaleString()}</Text>
-            <Text style={styles.deliveryText}>Livraison disponible</Text>
-          </View>
-          
-          <TouchableOpacity style={styles.messageButton} onPress={async () => {
-            if (!user) {
-              Alert.alert('Connexion requise', 'Connectez-vous pour envoyer un message');
-              return;
-            }
+        <>
+          {/* Quick Action Buttons */}
+          <View style={styles.quickActions}>
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={handleIsAvailable}
+            >
+              <MessageCircle size={18} color={Colors.primary} />
+              <Text style={styles.quickActionText}>Est-ce disponible?</Text>
+            </TouchableOpacity>
             
-            // Create or get conversation
-            try {
-              const { data: existingConv, error: fetchError } = await supabase
-                .from('conversations')
-                .select('id')
-                .eq('listing_id', listing.id)
-                .eq('buyer_id', user.id)
-                .single();
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={handleMakeOffer}
+            >
+              <DollarSign size={18} color={Colors.primary} />
+              <Text style={styles.quickActionText}>Faire une offre</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={handleCustomMessage}
+            >
+              <MessageCircle size={18} color={Colors.primary} />
+              <Text style={styles.quickActionText}>Message personnalisé</Text>
+            </TouchableOpacity>
+          </View>
 
-              if (existingConv) {
-                router.push(`/chat/${existingConv.id}`);
-              } else {
-                const { data: newConv, error: createError } = await supabase
-                  .from('conversations')
-                  .insert({
-                    listing_id: listing.id,
-                    buyer_id: user.id,
-                    seller_id: listing.seller_id,
-                  })
-                  .select()
-                  .single();
-
-                if (createError) throw createError;
-                router.push(`/chat/${newConv.id}`);
-              }
-            } catch (error) {
-              console.error('Error creating conversation:', error);
-              Alert.alert('Erreur', 'Impossible de démarrer la conversation');
-            }
-          }}>
-            <MessageCircle size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
+          {/* Footer with price and message button */}
+          <View style={styles.footer}>
+            <View style={styles.priceSection}>
+              <Text style={styles.footerPrice}>{formatPrice(listing.price)}</Text>
+              <Text style={styles.deliveryText}>Livraison disponible</Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.messageButton} 
+              onPress={() => {
+                const greeting = `Bonjour! Je suis intéressé par "${listing.title}" et j'aimerais l'acheter.`;
+                handleQuickMessage(greeting);
+              }}
+            >
+              <MessageCircle size={24} color="#fff" />
+              <Text style={styles.messageButtonText}>Message</Text>
+            </TouchableOpacity>
+          </View>
+        </>
       )}
 
       {/* Image Modal */}
@@ -646,29 +859,14 @@ export default function ListingDetailScreen() {
             <X size={24} color="#fff" />
           </TouchableOpacity>
 
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            contentOffset={{ x: modalImageIndex * width, y: 0 }}
-            onScroll={event => {
-              const index = Math.round(
-                event.nativeEvent.contentOffset.x / width
-              );
-              setModalImageIndex(index);
-            }}
-            scrollEventThrottle={16}
-          >
-            {images.map((imageUrl, index) => (
-              <View key={index} style={styles.modalImageContainer}>
-                <Image
-                  source={{ uri: imageUrl }}
-                  style={styles.modalImage}
-                  resizeMode="contain"
-                />
-              </View>
-            ))}
-          </ScrollView>
+          {/* Single Image Display */}
+          <View style={styles.modalImageContainer}>
+            <Image
+              source={{ uri: images[modalImageIndex] }}
+              style={styles.modalImage}
+              resizeMode="contain"
+            />
+          </View>
 
           {images.length > 1 && (
             <>
@@ -687,20 +885,146 @@ export default function ListingDetailScreen() {
               </TouchableOpacity>
 
               <View style={styles.modalIndicator}>
-                {images.map((_, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.modalDot,
-                      index === modalImageIndex && styles.modalDotActive,
-                    ]}
-                  />
-                ))}
+                <Text style={styles.modalCounterText}>
+                  {modalImageIndex + 1} / {images.length}
+                </Text>
               </View>
             </>
           )}
         </View>
       </Modal>
+
+      {/* Offer Modal */}
+      <Modal
+        visible={showOfferModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowOfferModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.offerModalContainer}>
+            <View style={styles.offerModalHeader}>
+              <Text style={styles.offerModalTitle}>Faire une offre</Text>
+              <TouchableOpacity onPress={() => setShowOfferModal(false)}>
+                <X size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.offerModalSubtitle}>
+              Prix demandé: {formatPrice(listing?.price || 0)}
+            </Text>
+            
+            <View style={styles.offerInputContainer}>
+              <Text style={styles.offerInputLabel}>Votre offre (USD)</Text>
+              <TextInput
+                style={styles.offerInput}
+                placeholder="Entrez votre offre"
+                keyboardType="numeric"
+                value={offerAmount}
+                onChangeText={setOfferAmount}
+                autoFocus
+              />
+            </View>
+            
+            <View style={styles.offerModalButtons}>
+              <TouchableOpacity 
+                style={styles.offerCancelButton}
+                onPress={() => {
+                  setShowOfferModal(false);
+                  setOfferAmount('');
+                }}
+              >
+                <Text style={styles.offerCancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.offerSubmitButton}
+                onPress={submitOffer}
+              >
+                <Text style={styles.offerSubmitButtonText}>Envoyer l'offre</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Message Modal */}
+      <Modal
+        visible={showCustomMessageModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCustomMessageModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.offerModalContainer}>
+            <View style={styles.offerModalHeader}>
+              <Text style={styles.offerModalTitle}>Message personnalisé</Text>
+              <TouchableOpacity onPress={() => setShowCustomMessageModal(false)}>
+                <X size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.offerInputContainer}>
+              <Text style={styles.offerInputLabel}>Votre message</Text>
+              <TextInput
+                style={[styles.offerInput, styles.customMessageInput]}
+                placeholder="Écrivez votre message..."
+                multiline
+                numberOfLines={4}
+                value={customMessage}
+                onChangeText={setCustomMessage}
+                autoFocus
+              />
+            </View>
+            
+            <View style={styles.offerModalButtons}>
+              <TouchableOpacity 
+                style={styles.offerCancelButton}
+                onPress={() => {
+                  setShowCustomMessageModal(false);
+                  setCustomMessage('');
+                }}
+              >
+                <Text style={styles.offerCancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.offerSubmitButton}
+                onPress={submitCustomMessage}
+              >
+                <Text style={styles.offerSubmitButtonText}>Envoyer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Safety Tips Modal */}
+      <SafetyTipsModal
+        visible={showSafetyTipsModal}
+        onClose={() => setShowSafetyTipsModal(false)}
+        onProceed={() => {
+          const greeting = `Bonjour! Je suis intéressé par "${listing?.title}" et j'aimerais l'acheter.`;
+          proceedToChat(greeting);
+        }}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        title={listing?.title || ''}
+        url={`https://marche.cd/listing/${id}`}
+        type="listing"
+      />
+
+      {/* Promote Modal */}
+      <PromoteModal
+        visible={showPromoteModal}
+        onClose={() => setShowPromoteModal(false)}
+        listingId={id as string}
+        onSuccess={loadListing}
+      />
       </View>
     </SafeAreaView>
   );
@@ -709,7 +1033,7 @@ export default function ListingDetailScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#bedc39',
+    backgroundColor: '#a8f5b8',
   },
   container: {
     flex: 1,
@@ -745,7 +1069,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   errorBackButton: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -757,75 +1081,100 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
+    backgroundColor: '#f8fafc',
   },
   image: {
     width,
-    height: 280,
+    height: 320,
     backgroundColor: '#f8fafc',
   },
   backButton: {
     position: 'absolute',
     top: 16,
     left: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  favoriteButton: {
+  shareButton: {
+    position: 'absolute',
+    top: 16,
+    left: 64,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  imageCountBadge: {
     position: 'absolute',
     top: 16,
     right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  navButtonLeft: {
-    position: 'absolute',
-    left: 16,
-    top: '50%',
-    marginTop: -20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+  imageCountText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
   },
-  navButtonRight: {
-    position: 'absolute',
-    right: 16,
-    top: '50%',
-    marginTop: -20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+  thumbnailContainer: {
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
-  imageIndicator: {
+  thumbnailScrollContent: {
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  thumbnailWrapper: {
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    position: 'relative',
+  },
+  thumbnailWrapperActive: {
+    borderColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbnailOverlay: {
     position: 'absolute',
-    bottom: 16,
+    top: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  dotActive: {
-    backgroundColor: '#fff',
+    bottom: 0,
+    backgroundColor: 'rgba(168, 245, 184, 0.2)',
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    borderRadius: 10,
   },
   content: {
     padding: 20,
@@ -844,7 +1193,7 @@ const styles = StyleSheet.create({
   },
   breadcrumbText: {
     fontSize: 13,
-    color: '#9bbd1f',
+    color: Colors.primary,
     fontWeight: '500',
   },
   breadcrumbSeparator: {
@@ -853,7 +1202,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
   },
   breadcrumbActive: {
-    color: '#9bbd1f',
+    color: Colors.primary,
     fontWeight: '600',
   },
   header: {
@@ -908,7 +1257,7 @@ const styles = StyleSheet.create({
   },
   reviewsText: {
     fontSize: 14,
-    color: '#9bbd1f',
+    color: Colors.primary,
   },
   recommendText: {
     fontSize: 16,
@@ -973,7 +1322,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1063,12 +1412,83 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1e293b',
   },
-
+  locationInfo: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 16,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  locationTextContainer: {
+    flex: 1,
+  },
+  locationCity: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  locationDistance: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: '500',
+  },
+  mapContainer: {
+    height: 200,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    position: 'relative',
+  },
+  map: {
+    width: '100%',
+    height: '100%',
+  },
+  mapOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  mapOverlayText: {
+    fontSize: 12,
+    color: '#fff',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  circleOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    pointerEvents: 'none',
+  },
+  greenCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 3,
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(168, 245, 184, 0.2)',
+  },
 
   // Modal styles
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1077,7 +1497,7 @@ const styles = StyleSheet.create({
     top: 50,
     right: 20,
     zIndex: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -1085,13 +1505,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalImageContainer: {
-    width,
+    width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   modalImage: {
-    width: width - 40,
+    width: '100%',
     height: '80%',
   },
   modalNavLeft: {
@@ -1099,7 +1520,7 @@ const styles = StyleSheet.create({
     left: 20,
     top: '50%',
     marginTop: -25,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     width: 50,
     height: 50,
     borderRadius: 25,
@@ -1111,7 +1532,7 @@ const styles = StyleSheet.create({
     right: 20,
     top: '50%',
     marginTop: -25,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     width: 50,
     height: 50,
     borderRadius: 25,
@@ -1123,18 +1544,16 @@ const styles = StyleSheet.create({
     bottom: 50,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
+    alignItems: 'center',
   },
-  modalDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  modalDotActive: {
-    backgroundColor: '#fff',
+  modalCounterText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
 
   // Safety guide styles
@@ -1236,6 +1655,51 @@ const styles = StyleSheet.create({
     color: '#166534',
     lineHeight: 18,
   },
+  ownerQuickActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#f8fafc',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  promoteButtonQuick: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fbbf24',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    shadowColor: '#fbbf24',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  promoteButtonQuickText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  promotedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fbbf24',
+  },
+  promotedIndicatorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400e',
+  },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1264,10 +1728,10 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 64,
     borderRadius: 20,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -1277,16 +1741,127 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 64,
     borderRadius: 20,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
   },
   editButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  quickActions: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f8fafc',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  quickActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+  },
+  quickActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  messageButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  offerModalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  offerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  offerModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  offerModalSubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 20,
+  },
+  offerInputContainer: {
+    marginBottom: 24,
+  },
+  offerInputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  offerInput: {
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#1e293b',
+    backgroundColor: '#fff',
+  },
+  customMessageInput: {
+    height: 120,
+    textAlignVertical: 'top',
+  },
+  offerModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  offerCancelButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+  },
+  offerCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  offerSubmitButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+  },
+  offerSubmitButtonText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#fff',

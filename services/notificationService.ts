@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
+import Colors from '@/constants/Colors';
 
 // Configure how notifications should be handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -78,7 +79,7 @@ class NotificationService {
           name: 'Messages',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#9bbd1f',
+          lightColor: Colors.primary,
           sound: 'default',
         });
       }

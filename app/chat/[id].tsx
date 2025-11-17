@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View,
+View,
   Text,
   TextInput,
   TouchableOpacity,
@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/contexts/MessagesContext';
 import { Message, Conversation } from '@/types/chat';
+import Colors from '@/constants/Colors';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams();
@@ -505,7 +506,7 @@ export default function ChatScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#9bbd1f" />
+          <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -673,7 +674,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -705,11 +706,11 @@ const styles = StyleSheet.create({
   listingPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(229, 229, 234, 0.2)',
+    borderBottomColor: '#e5e5ea',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -783,7 +784,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -803,6 +804,7 @@ const styles = StyleSheet.create({
     width: 40,
   },
   messageWrapper: {
+    flex: 1,
     alignItems: 'flex-start',
   },
   messageBubble: {
@@ -814,7 +816,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
-    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
   myMessageBubble: {
     backgroundColor: '#22c55e',
@@ -827,6 +829,7 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 16,
     lineHeight: 22,
+    flexWrap: 'wrap',
   },
   myMessageText: {
     color: '#fff',

@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import * as Notifications from 'expo-notifications';
+import Colors from '@/constants/Colors';
 
 export default function Index() {
   const { session, loading } = useAuth();
@@ -32,7 +33,7 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#9bbd1f" />
+      <ActivityIndicator size="large" color={Colors.primary} />
     </View>
   );
 }

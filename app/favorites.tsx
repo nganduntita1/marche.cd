@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
+View,
   Text,
   FlatList,
   StyleSheet,
@@ -14,6 +14,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import ListingCard from '@/components/ListingCard';
 import { ListingWithDetails } from '@/types/database';
+import Colors from '@/constants/Colors';
+import { TextStyles } from '@/constants/Typography';
 
 export default function FavoritesScreen() {
   const router = useRouter();
@@ -90,7 +92,7 @@ export default function FavoritesScreen() {
             <View style={styles.placeholder} />
           </View>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#9bbd1f" />
+            <ActivityIndicator size="large" color={Colors.primary} />
           </View>
         </View>
       </SafeAreaView>
@@ -222,11 +224,11 @@ const styles = StyleSheet.create({
     maxWidth: 280,
   },
   browseButton: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 12,
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,

@@ -19,6 +19,7 @@ import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import Colors from '@/constants/Colors';
 import { ListingWithDetails, ListingCondition, Category } from '@/types/database';
 
 export default function EditListingScreen() {
@@ -139,7 +140,7 @@ export default function EditListingScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#9bbd1f" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text>Chargement des détails de l'annonce...</Text>
       </SafeAreaView>
     );
@@ -299,7 +300,7 @@ const styles = StyleSheet.create({
     height: 50,
   },
   submitButton: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',

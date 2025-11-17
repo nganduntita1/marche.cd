@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
+View,
   Text,
   Image,
   StyleSheet,
@@ -11,6 +11,8 @@ import {
 import { useRouter } from 'expo-router';
 import { MapPin, Star, CheckCircle2, Heart, Trash2, Edit3 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import Colors from '@/constants/Colors';
+import { TextStyles } from '@/constants/Typography';
 
 type ListingCardProps = {
   id: string;
@@ -19,9 +21,11 @@ type ListingCardProps = {
   image: string;
   status: 'active' | 'sold';
   location?: string;
+  distance?: number;
   sellerRating?: number;
   isVerified?: boolean;
   isOwner?: boolean;
+  isPromoted?: boolean;
   onDelete?: () => void;
 };
 
@@ -35,9 +39,11 @@ export default function ListingCard({
   image, 
   status,
   location,
+  distance,
   sellerRating,
   isVerified = false,
   isOwner = false,
+  isPromoted = false,
   onDelete
 }: ListingCardProps) {
   const router = useRouter();
@@ -171,6 +177,12 @@ export default function ListingCard({
           </View>
         )}
         
+        {isPromoted && status !== 'sold' && (
+          <View style={styles.promotedBadge}>
+            <Text style={styles.promotedBadgeText}>⭐ PROMU</Text>
+          </View>
+        )}
+        
         {isOwner ? (
           <View style={styles.ownerActions}>
             <TouchableOpacity
@@ -210,11 +222,14 @@ export default function ListingCard({
           {title}
         </Text>
         
-        {location && (
+        {(location || distance !== undefined) && (
           <View style={styles.locationContainer}>
             <MapPin size={12} color="#64748b" />
             <Text style={styles.location} numberOfLines={1}>
-              {location}
+              {distance !== undefined 
+                ? `${distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`}${location ? ` • ${location}` : ''}`
+                : location
+              }
             </Text>
           </View>
         )}
@@ -236,7 +251,7 @@ export default function ListingCard({
               )}
               {isVerified && (
                 <View style={styles.verifiedBadge}>
-                  <CheckCircle2 size={14} color="#fff" fill="#9bbd1f" />
+                  <CheckCircle2 size={14} color="#fff" fill={Colors.primary} />
                 </View>
               )}
             </View>
@@ -292,6 +307,26 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
+  },
+  promotedBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#fbbf24',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  promotedBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   favoriteButton: {
     position: 'absolute',
@@ -375,7 +410,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#9bbd1f',
+    color: Colors.primary,
   },
   trustBadges: {
     flexDirection: 'row',

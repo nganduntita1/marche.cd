@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View,
+View,
   Text,
   TextInput,
   TouchableOpacity,
@@ -20,11 +20,17 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { supabase } from '@/lib/supabase';
 import Popup from '@/components/Popup';
-import { Bell, Camera, FileText, Tag, DollarSign, X, Check } from 'lucide-react-native';
+import { Bell, Camera, FileText, Tag, DollarSign, X, Check, MapPin, Navigation } from 'lucide-react-native';
+import Colors from '@/constants/Colors';
+import { TextStyles } from '@/constants/Typography';
+import { useLocation } from '@/contexts/LocationContext';
+import { getCurrentLocation, getCityFromCoordinates } from '@/services/locationService';
+import CityPickerModal from '@/components/CityPickerModal';
 
 export default function PostScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { userLocation, currentCity } = useLocation();
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -36,6 +42,11 @@ export default function PostScreen() {
   const [showNoCreditsPopup, setShowNoCreditsPopup] = useState(false);
   const [newListingId, setNewListingId] = useState<string | null>(null);
   const [customCategory, setCustomCategory] = useState('');
+  const [city, setCity] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(false);
 
   const resetForm = () => {
     setTitle('');
@@ -90,7 +101,35 @@ export default function PostScreen() {
     setShowCategoryModal(false);
   };
 
+  const detectLocation = async () => {
+    setDetectingLocation(true);
+    try {
+      const coords = await getCurrentLocation();
+      if (coords) {
+        setLatitude(coords.latitude);
+        setLongitude(coords.longitude);
+        const cityName = await getCityFromCoordinates(coords.latitude, coords.longitude);
+        if (cityName) {
+          setCity(cityName);
+        }
+      }
+    } catch (error) {
+      console.log('Could not detect location:', error);
+    } finally {
+      setDetectingLocation(false);
+    }
+  };
 
+  // Auto-detect location on mount
+  React.useEffect(() => {
+    if (userLocation && currentCity) {
+      setLatitude(userLocation.latitude);
+      setLongitude(userLocation.longitude);
+      setCity(currentCity);
+    } else {
+      detectLocation();
+    }
+  }, []);
 
   const handleSubmit = async () => {
     if (!user?.phone || !user?.location) {
@@ -200,6 +239,10 @@ export default function PostScreen() {
           images: imageUrls,
           status: 'active',
           location: user.location,
+          latitude,
+          longitude,
+          city: city || currentCity || user.location,
+          country: 'Congo (RDC)',
         })
         .select()
         .single();
@@ -255,7 +298,7 @@ export default function PostScreen() {
               <Text style={styles.messageText}>Connectez-vous pour publier vos annonces et commencer à vendre.</Text>
               <TouchableOpacity style={styles.modernActionButton} onPress={() => router.push('/auth/login')}>
                 <LinearGradient
-                  colors={['#9bbd1f', '#7da01a']}
+                  colors={[Colors.primary, '#7da01a']}
                   style={styles.modernActionButtonGradient}
                 >
                   <Text style={styles.buttonText}>Se connecter</Text>
@@ -298,7 +341,7 @@ export default function PostScreen() {
               <Text style={styles.messageText}>Complétez votre profil avec votre numéro WhatsApp et votre ville pour publier des annonces.</Text>
               <TouchableOpacity style={styles.modernActionButton} onPress={() => router.push('/auth/complete-profile')}>
                 <LinearGradient
-                  colors={['#9bbd1f', '#7da01a']}
+                  colors={[Colors.primary, '#7da01a']}
                   style={styles.modernActionButtonGradient}
                 >
                   <Text style={styles.buttonText}>Compléter mon profil</Text>
@@ -337,7 +380,7 @@ export default function PostScreen() {
           {/* Images */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <Camera size={18} color="#9bbd1f" />
+              <Camera size={18} color={Colors.primary} />
               <Text style={styles.label}>Images (max 5) *</Text>
             </View>
             <Text style={styles.labelHint}>Ajoutez des photos de qualité pour attirer plus d'acheteurs</Text>
@@ -372,7 +415,7 @@ export default function PostScreen() {
           {/* Title */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <FileText size={18} color="#9bbd1f" />
+              <FileText size={18} color={Colors.primary} />
               <Text style={styles.label}>Titre *</Text>
             </View>
             <View style={styles.inputContainer}>
@@ -391,7 +434,7 @@ export default function PostScreen() {
           {/* Category */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <Tag size={18} color="#9bbd1f" />
+              <Tag size={18} color={Colors.primary} />
               <Text style={styles.label}>Catégorie *</Text>
             </View>
             <TouchableOpacity style={styles.selectContainer} onPress={() => setShowCategoryModal(true)}>
@@ -423,7 +466,7 @@ export default function PostScreen() {
           {/* Description */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <FileText size={18} color="#9bbd1f" />
+              <FileText size={18} color={Colors.primary} />
               <Text style={styles.label}>Description *</Text>
             </View>
             <Text style={styles.labelHint}>Décrivez l'état, les caractéristiques et les détails importants</Text>
@@ -446,7 +489,7 @@ export default function PostScreen() {
           {/* Price */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <DollarSign size={18} color="#9bbd1f" />
+              <DollarSign size={18} color={Colors.primary} />
               <Text style={styles.label}>Prix (USD) *</Text>
             </View>
             <View style={styles.inputContainer}>
@@ -458,6 +501,30 @@ export default function PostScreen() {
                 placeholderTextColor="#94a3b8"
                 keyboardType="decimal-pad" 
               />
+            </View>
+          </View>
+
+          {/* Location */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <MapPin size={18} color={Colors.primary} />
+              <Text style={styles.label}>Ville *</Text>
+            </View>
+            <View style={styles.inputContainer}>
+              <TextInput 
+                style={[styles.input, { flex: 1 }]} 
+                value={city} 
+                onChangeText={setCity} 
+                placeholder="Votre ville" 
+                placeholderTextColor="#94a3b8"
+              />
+              <TouchableOpacity 
+                onPress={detectLocation}
+                style={styles.locationButton}
+                disabled={detectingLocation}
+              >
+                <Navigation size={20} color={detectingLocation ? '#94a3b8' : Colors.primary} />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -474,7 +541,7 @@ export default function PostScreen() {
               colors={
                 (isSubmitting || !title || !category || !description || !price || images.length === 0)
                   ? ['#94a3b8', '#64748b']
-                  : ['#9bbd1f', '#7da01a']
+                  : [Colors.primary, '#7da01a']
               }
               style={styles.submitButtonGradient}
             >
@@ -499,7 +566,7 @@ export default function PostScreen() {
             >
               <View style={styles.modalHeader}>
                 <View style={styles.modalHeaderText}>
-                  <Tag size={24} color="#9bbd1f" />
+                  <Tag size={24} color={Colors.primary} />
                   <View style={styles.modalTitleContainer}>
                     <Text style={styles.modalTitle}>Choisir une catégorie</Text>
                     <Text style={styles.modalSubtitle}>Sélectionnez la catégorie qui correspond le mieux</Text>
@@ -521,7 +588,7 @@ export default function PostScreen() {
                     </Text>
                     {category === item.value && (
                       <View style={styles.checkmarkContainer}>
-                        <Check size={20} color="#9bbd1f" strokeWidth={3} />
+                        <Check size={20} color={Colors.primary} strokeWidth={3} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -638,7 +705,7 @@ const styles = StyleSheet.create({
   },
   modernActionButton: {
     borderRadius: 16,
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -697,6 +764,9 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   input: { 
     borderWidth: 1, 
@@ -707,6 +777,16 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     backgroundColor: '#f8fafc',
     color: '#1e293b',
+  },
+  locationButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#f0f9ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.primary,
   },
   textArea: { 
     minHeight: 120,
@@ -826,7 +906,7 @@ const styles = StyleSheet.create({
   submitButton: {
     borderRadius: 16,
     marginTop: 24,
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -918,7 +998,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   categoryItemTextSelected: { 
-    color: '#9bbd1f', 
+    color: Colors.primary, 
     fontWeight: '600' 
   },
   checkmarkContainer: {

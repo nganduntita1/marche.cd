@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View,
+View,
   Text,
   TouchableOpacity,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react-native';
+import Colors from '@/constants/Colors';
 
 export default function HelpCenterScreen() {
   const router = useRouter();
@@ -89,7 +90,7 @@ export default function HelpCenterScreen() {
               >
                 <Text style={styles.faqQuestionText}>{faq.question}</Text>
                 {expandedIndex === index ? (
-                  <ChevronUp size={20} color="#9bbd1f" />
+                  <ChevronUp size={20} color={Colors.primary} />
                 ) : (
                   <ChevronDown size={20} color="#64748b" />
                 )}
@@ -227,7 +228,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   contactButton: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 12,

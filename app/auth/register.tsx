@@ -13,12 +13,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Mail, Eye, EyeOff, User, CheckSquare, Square } from 'lucide-react-native';
+import { Phone, Eye, EyeOff, User, CheckSquare, Square, Mail, MapPin } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import Colors from '@/constants/Colors';
+import { TextStyles } from '@/constants/Typography';
 
 export default function RegisterScreen() {
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [location, setLocation] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -29,9 +35,43 @@ export default function RegisterScreen() {
   const { signUp } = useAuth();
   const router = useRouter();
 
+  const generateEmail = async (firstName: string, lastName: string): Promise<string> => {
+    // Clean and normalize names
+    const cleanFirst = firstName.trim().toLowerCase().replace(/\s+/g, '');
+    const cleanLast = lastName.trim().toLowerCase().replace(/\s+/g, '');
+    const baseEmail = `${cleanFirst}.${cleanLast}@marchecd.com`;
+
+    // Check if email exists
+    const { data: existingUsers } = await supabase
+      .from('users')
+      .select('email')
+      .like('email', `${cleanFirst}.${cleanLast}%@marchecd.com`);
+
+    if (!existingUsers || existingUsers.length === 0) {
+      return baseEmail;
+    }
+
+    // Find the next available number
+    let counter = 1;
+    let emailExists = true;
+    let newEmail = baseEmail;
+
+    while (emailExists) {
+      newEmail = `${cleanFirst}.${cleanLast}${counter}@marchecd.com`;
+      const exists = existingUsers.some(u => u.email === newEmail);
+      if (!exists) {
+        emailExists = false;
+      } else {
+        counter++;
+      }
+    }
+
+    return newEmail;
+  };
+
   const handleRegister = async () => {
-    if (!name || !email || !password || !confirmPassword) {
-      setError('Veuillez remplir tous les champs');
+    if (!firstName || !lastName || !phone || !location || !password || !confirmPassword) {
+      setError('Veuillez remplir tous les champs obligatoires');
       return;
     }
 
@@ -50,12 +90,22 @@ export default function RegisterScreen() {
       return;
     }
 
+    // Validate phone number format
+    if (!phone.startsWith('+243') && !phone.startsWith('0')) {
+      setError('Le numéro de téléphone doit commencer par +243 ou 0');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      await signUp(email, password, name);
-      router.replace('/auth/complete-profile');
+      // Use provided email or generate one
+      const finalEmail = email.trim() || await generateEmail(firstName, lastName);
+      const fullName = `${firstName} ${lastName}`;
+
+      await signUp(finalEmail, password, fullName, phone, location);
+      router.replace('/(tabs)');
     } catch (err: any) {
       setError(err.message || 'Erreur lors de la création du compte');
     } finally {
@@ -74,20 +124,30 @@ export default function RegisterScreen() {
           showsVerticalScrollIndicator={false}
         >
           <LinearGradient
-            colors={['#9bbd1f', '#bedc39']}
+            colors={['#60c882', Colors.primary, '#c7f9cc', '#00a85d', '#60c882']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            locations={[0, 0.25, 0.5, 0.75, 1]}
             style={styles.gradientHeader}
           >
-            <Image 
-              source={require('@/assets/images/logo.png')} 
-              style={styles.logo} 
-              resizeMode="contain" 
-            />
-            <View style={styles.welcomeContainer}>
-              <Text style={styles.welcomeText}>Rejoignez</Text>
-            </View>
-            <Text style={styles.subtitle}>
-              Créez votre compte et commencez à acheter et vendre au Congo
-            </Text>
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.15)', 'transparent', 'rgba(255, 255, 255, 0.1)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.meshOverlay}
+            >
+              <Image 
+                source={require('@/assets/images/logo.png')} 
+                style={styles.logo} 
+                resizeMode="contain" 
+              />
+              <View style={styles.welcomeContainer}>
+                <Text style={styles.welcomeText}>Rejoignez</Text>
+              </View>
+              <Text style={styles.subtitle}>
+                Créez votre compte et commencez à acheter et vendre au Congo
+              </Text>
+            </LinearGradient>
           </LinearGradient>
 
           <View style={styles.form}>
@@ -98,14 +158,14 @@ export default function RegisterScreen() {
             ) : null}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nom complet</Text>
+              <Text style={styles.label}>Prénom</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Votre nom"
+                  placeholder="Votre prénom"
                   placeholderTextColor="#94a3b8"
-                  value={name}
-                  onChangeText={setName}
+                  value={firstName}
+                  onChangeText={setFirstName}
                 />
                 <View style={styles.inputIcon}>
                   <User size={20} color="#64748b" />
@@ -114,7 +174,23 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Adresse Email</Text>
+              <Text style={styles.label}>Nom de famille</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Votre nom de famille"
+                  placeholderTextColor="#94a3b8"
+                  value={lastName}
+                  onChangeText={setLastName}
+                />
+                <View style={styles.inputIcon}>
+                  <User size={20} color="#64748b" />
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email (optionnel)</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -127,6 +203,42 @@ export default function RegisterScreen() {
                 />
                 <View style={styles.inputIcon}>
                   <Mail size={20} color="#64748b" />
+                </View>
+              </View>
+              <Text style={styles.hint}>
+                Si vide, nous créerons un email automatiquement
+              </Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Numéro de téléphone *</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="+243 ou 0..."
+                  placeholderTextColor="#94a3b8"
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                />
+                <View style={styles.inputIcon}>
+                  <Phone size={20} color="#64748b" />
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Ville *</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Kinshasa, Lubumbashi, etc."
+                  placeholderTextColor="#94a3b8"
+                  value={location}
+                  onChangeText={setLocation}
+                />
+                <View style={styles.inputIcon}>
+                  <MapPin size={20} color="#64748b" />
                 </View>
               </View>
             </View>
@@ -186,7 +298,7 @@ export default function RegisterScreen() {
             >
               <View style={styles.checkbox}>
                 {agreedToTerms ? (
-                  <CheckSquare size={24} color="#9bbd1f" fill="#9bbd1f" />
+                  <CheckSquare size={24} color={Colors.primary} fill={Colors.primary} />
                 ) : (
                   <Square size={24} color="#94a3b8" />
                 )}
@@ -232,11 +344,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   gradientHeader: {
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+  },
+  meshOverlay: {
     paddingHorizontal: 24,
     paddingTop: 40,
     paddingBottom: 48,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
   },
   logo: {
     width: 180,
@@ -247,17 +362,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   welcomeText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#fff',
+    ...TextStyles.h4,
+    color: '#000000',
     marginBottom: 12,
-    opacity: 0.95,
   },
   subtitle: {
+    ...TextStyles.body,
     fontSize: 15,
-    color: '#fff',
-    lineHeight: 22,
-    opacity: 0.9,
+    color: '#000000',
+    opacity: 0.85,
   },
   form: {
     padding: 24,
@@ -267,8 +380,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
+    ...TextStyles.label,
     fontSize: 16,
-    fontWeight: '600',
     marginBottom: 12,
     color: '#1e293b',
   },
@@ -309,15 +422,15 @@ const styles = StyleSheet.create({
   },
   checkboxLink: {
     fontWeight: '700',
-    color: '#9bbd1f',
+    color: Colors.primary,
   },
   button: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
     marginTop: 8,
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -327,9 +440,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: '#fff',
+    ...TextStyles.button,
     fontSize: 17,
-    fontWeight: '700',
+    color: '#fff',
   },
   linkButton: {
     marginTop: 24,
@@ -340,7 +453,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   linkBold: {
-    color: '#9bbd1f',
+    color: Colors.primary,
     fontWeight: '700',
   },
   errorContainer: {
@@ -355,5 +468,11 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 14,
     fontWeight: '500',
+  },
+  hint: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 6,
+    fontStyle: 'italic',
   },
 });

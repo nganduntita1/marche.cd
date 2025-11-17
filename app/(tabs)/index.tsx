@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  FlatList,
+  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Image,
   Modal,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,16 +25,27 @@ import {
   Bell,
   SlidersHorizontal
 } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { ListingWithDetails, Category } from '@/types/database';
 import ListingCard from '@/components/ListingCard';
+import FeaturedListingCard from '@/components/FeaturedListingCard';
+import LocationHeader from '@/components/LocationHeader';
+import CityPickerModal from '@/components/CityPickerModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from '@/contexts/LocationContext';
+import { calculateDistance, formatDistance } from '@/services/locationService';
+import Colors from '@/constants/Colors';
+import { TextStyles } from '@/constants/Typography';
 
 // Major cities in DRC (includes user examples like Kipushi & Lubumbashi)
 // Location picker disabled for now
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const { userLocation, currentCity, loading: locationLoading, refreshLocation, setManualLocation } = useLocation();
+  const { t } = useTranslation();
   const [listings, setListings] = useState<ListingWithDetails[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -45,9 +57,18 @@ export default function HomeScreen() {
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
   const [tempPriceRange, setTempPriceRange] = useState({ min: '', max: '' });
   const [showPriceModal, setShowPriceModal] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(false);
   const [stats, setStats] = useState({ totalListings: 0, totalFavorites: 0, todayListings: 0 });
   const [userFavoritesCount, setUserFavoritesCount] = useState(0);
+  const [searchRadius, setSearchRadius] = useState<number | null>(null); // null = show all
+  const [showRadiusModal, setShowRadiusModal] = useState(false);
   const router = useRouter();
+  
+  // Header animation
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
+  const headerTranslateY = useRef(new Animated.Value(-100)).current;
+  const headerOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadCategories();
@@ -211,13 +232,133 @@ export default function HomeScreen() {
     loadListings();
   };
 
-  const filteredListings = listings.filter(listing =>
-    listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    listing.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [isHeaderFixed, setIsHeaderFixed] = useState(false);
 
-  const renderHeader = () => (
-    <View style={styles.headerContainer}>
+  const handleScroll = (event: any) => {
+    const currentScrollY = event.nativeEvent.contentOffset.y;
+    const scrollDiff = currentScrollY - lastScrollY.current;
+    
+    if (scrollDiff < 0 && currentScrollY > 50) {
+      // Scrolling up - make header fixed with animation
+      if (!isHeaderFixed) {
+        setIsHeaderFixed(true);
+        // Animate header sliding down
+        Animated.parallel([
+          Animated.timing(headerTranslateY, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(headerOpacity, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    } else if (scrollDiff > 0) {
+      // Scrolling down - header not fixed
+      if (isHeaderFixed) {
+        // Animate header sliding up
+        Animated.parallel([
+          Animated.timing(headerTranslateY, {
+            toValue: -100,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(headerOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setIsHeaderFixed(false);
+        });
+      }
+    }
+    
+    if (currentScrollY <= 0) {
+      if (isHeaderFixed) {
+        Animated.parallel([
+          Animated.timing(headerTranslateY, {
+            toValue: -100,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(headerOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setIsHeaderFixed(false);
+        });
+      }
+    }
+    
+    lastScrollY.current = currentScrollY;
+  };
+
+  // Filter listings by search, category, price, and distance
+  const filteredListings = listings
+    .filter(listing => {
+      // Search filter
+      const matchesSearch = listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        listing.description.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      // Category filter
+      const matchesCategory = !selectedCategory || listing.category_id === selectedCategory;
+      
+      // Price filter
+      const minPrice = priceRange.min ? parseFloat(priceRange.min) : 0;
+      const maxPrice = priceRange.max ? parseFloat(priceRange.max) : Infinity;
+      const matchesPrice = listing.price >= minPrice && listing.price <= maxPrice;
+      
+      // Distance filter
+      let matchesDistance = true;
+      if (searchRadius && userLocation && listing.latitude && listing.longitude) {
+        const distance = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          listing.latitude,
+          listing.longitude
+        );
+        matchesDistance = distance <= searchRadius;
+      }
+      
+      return matchesSearch && matchesCategory && matchesPrice && matchesDistance;
+    })
+    .map(listing => {
+      // Add distance to each listing
+      if (userLocation && listing.latitude && listing.longitude) {
+        const distance = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          listing.latitude,
+          listing.longitude
+        );
+        return { ...listing, distance };
+      }
+      return listing;
+    });
+
+  const renderHeader = () => {
+    return (
+      <Animated.View 
+        style={[
+          styles.headerContainer,
+          isHeaderFixed && {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1000,
+            opacity: headerOpacity,
+            transform: [{ translateY: headerTranslateY }],
+          },
+        ]}
+      >
+
       {/* Top Bar with Logo and Icons */}
       <View style={styles.topBar}>
         <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
@@ -247,7 +388,7 @@ export default function HomeScreen() {
           <Search size={20} color="#94a3b8" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search"
+            placeholder="Rechercher"
             placeholderTextColor="#94a3b8"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -263,18 +404,38 @@ export default function HomeScreen() {
       </View>
 
       {/* Categories */}
-      <FlatList
+      <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        data={categories}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
+        contentContainerStyle={styles.categoriesList}
+      >
+        {/* All Categories Button */}
+        <TouchableOpacity
+          style={[
+            styles.categoryChip,
+            !selectedCategory && styles.categoryChipActive,
+          ]}
+          onPress={() => setSelectedCategory(null)}
+        >
+          <Text
+            style={[
+              styles.categoryChipText,
+              !selectedCategory && styles.categoryChipTextActive,
+            ]}
+          >
+            Tous
+          </Text>
+        </TouchableOpacity>
+        
+        {/* Individual Categories */}
+        {categories.map((item) => (
           <TouchableOpacity
+            key={item.id}
             style={[
               styles.categoryChip,
               item.id === selectedCategory && styles.categoryChipActive,
             ]}
-            onPress={() => setSelectedCategory(item.id === selectedCategory ? null : item.id)}
+            onPress={() => setSelectedCategory(item.id)}
           >
             <Text
               style={[
@@ -285,48 +446,126 @@ export default function HomeScreen() {
               {item.name}
             </Text>
           </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </Animated.View>
+    );
+  };
+
+  const renderLocationSelector = () => {
+    if (!currentCity) return null;
+
+    return (
+      <View style={styles.locationSelectorContainer}>
+        <TouchableOpacity 
+          style={styles.locationSelector}
+          onPress={() => {
+            setShowCityPicker(true);
+          }}
+        >
+          <Ionicons name="location-outline" size={20} color={Colors.primary} />
+          <View style={styles.locationTextContainer}>
+            <Text style={styles.locationLabel}>{t('home.location')}</Text>
+            <Text style={styles.locationText} numberOfLines={1}>
+              {currentCity}
+            </Text>
+          </View>
+          <Ionicons name="chevron-down" size={20} color={Colors.textSecondary} />
+        </TouchableOpacity>
+        
+        {userLocation && (
+          <TouchableOpacity 
+            style={styles.radiusSelector}
+            onPress={() => setShowRadiusModal(true)}
+          >
+            <Ionicons name="radio-outline" size={16} color={Colors.textSecondary} />
+            <Text style={styles.radiusText}>
+              {searchRadius ? `${t('home.within')} ${searchRadius} km` : t('home.allListings')}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color={Colors.textSecondary} />
+          </TouchableOpacity>
         )}
-        contentContainerStyle={styles.categoriesContainer}
-        style={styles.categoriesList}
-      />
-    </View>
-  );
+      </View>
+    );
+  };
 
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#9bbd1f" />
+          <ActivityIndicator size="large" color={Colors.primary} />
         </View>
         </View>
       </SafeAreaView>
     );
   }
 
-  const renderItem = ({ item }: { item: ListingWithDetails }) => {
-    const coercedStatus: 'active' | 'sold' = item.status === 'sold' ? 'sold' : 'active';
-    // Mock seller rating for now (will be real data later)
-    const mockRating = Math.random() > 0.3 ? (4 + Math.random()).toFixed(1) : undefined;
-    const isVerified = Math.random() > 0.5; // 50% chance of verified badge
-    const isOwner = user?.id === item.seller_id;
+  // Render listings with featured items inserted
+  const renderListingsGrid = () => {
+    const rows: React.ReactElement[] = [];
+    const itemsPerRow = 2;
+    const rowsBeforeFeatured = 3;
     
-    return (
-    <View style={styles.listingCardContainer}>
-      <ListingCard
-        id={item.id}
-        title={item.title}
-        price={item.price}
-        image={item.images[0]}
-        status={coercedStatus}
-        location={item.location}
-        sellerRating={mockRating ? parseFloat(mockRating) : undefined}
-        isVerified={isVerified}
-        isOwner={isOwner}
-        onDelete={loadListings}
-      />
-    </View>
-  );
+    for (let i = 0; i < filteredListings.length; i += itemsPerRow) {
+      const rowItems = filteredListings.slice(i, i + itemsPerRow);
+      const rowIndex = Math.floor(i / itemsPerRow);
+      
+      // Render regular row
+      rows.push(
+        <View key={`row-${i}`} style={styles.row}>
+          {rowItems.map((item) => {
+            const coercedStatus: 'active' | 'sold' = item.status === 'sold' ? 'sold' : 'active';
+            const mockRating = Math.random() > 0.3 ? (4 + Math.random()).toFixed(1) : undefined;
+            const isVerified = Math.random() > 0.5;
+            const isOwner = user?.id === item.seller_id;
+            
+            return (
+              <View key={item.id} style={styles.listingCardContainer}>
+                <ListingCard
+                  id={item.id}
+                  title={item.title}
+                  price={item.price}
+                  image={item.images[0]}
+                  status={coercedStatus}
+                  location={item.location}
+                  distance={(item as any).distance}
+                  sellerRating={mockRating ? parseFloat(mockRating) : undefined}
+                  isVerified={isVerified}
+                  isOwner={isOwner}
+                  isPromoted={item.is_promoted}
+                  onDelete={loadListings}
+                />
+              </View>
+            );
+          })}
+        </View>
+      );
+      
+      // Insert featured listing after every 3 rows
+      if ((rowIndex + 1) % rowsBeforeFeatured === 0 && i + itemsPerRow < filteredListings.length) {
+        const featuredIndex = Math.min(i + itemsPerRow, filteredListings.length - 1);
+        const featuredItem = filteredListings[featuredIndex];
+        
+        if (featuredItem) {
+          rows.push(
+            <View key={`featured-${i}`} style={styles.featuredContainer}>
+              <FeaturedListingCard
+                id={featuredItem.id}
+                title={featuredItem.title}
+                price={featuredItem.price}
+                image={featuredItem.images[0]}
+                location={featuredItem.location}
+                views={Math.floor(Math.random() * 500) + 100}
+                isFeatured={true}
+              />
+            </View>
+          );
+        }
+      }
+    }
+    
+    return rows;
   };
 
   return (
@@ -334,51 +573,57 @@ export default function HomeScreen() {
       <View style={styles.container}>
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#9bbd1f" />
+          <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : (
-        <FlatList
-          data={filteredListings}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          ListHeaderComponent={renderHeader()}
-          contentContainerStyle={styles.listingsContainer}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
-              onRefresh={onRefresh}
-              colors={['#9bbd1f']}
-              tintColor="#9bbd1f"
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <View style={styles.emptyStateIcon}>
-                <Package size={48} color="#cbd5e1" />
+        <View style={{ flex: 1 }}>
+          {isHeaderFixed && renderHeader()}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            contentContainerStyle={isHeaderFixed ? { paddingTop: 200 } : {}}
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={onRefresh}
+                colors={[Colors.primary]}
+                tintColor={Colors.primary}
+              />
+            }
+          >
+            {!isHeaderFixed && renderHeader()}
+            {renderLocationSelector()}
+            <View style={styles.listingsContainer}>
+            {filteredListings.length === 0 ? (
+              <View style={styles.emptyState}>
+                <View style={styles.emptyStateIcon}>
+                  <Package size={48} color="#cbd5e1" />
+                </View>
+                <Text style={styles.emptyStateTitle}>Aucune annonce trouvée</Text>
+                <Text style={styles.emptyStateText}>
+                  {searchQuery 
+                    ? 'Aucun résultat pour votre recherche'
+                    : 'Essayez de modifier vos critères de recherche'}
+                </Text>
+                {(searchQuery || selectedCategory) && (
+                  <TouchableOpacity 
+                    style={styles.resetButton}
+                    onPress={() => {
+                      setSearchQuery('');
+                      setSelectedCategory(null);
+                    }}
+                  >
+                    <Text style={styles.resetButtonText}>Réinitialiser les filtres</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              <Text style={styles.emptyStateTitle}>Aucune annonce trouvée</Text>
-              <Text style={styles.emptyStateText}>
-                {searchQuery 
-                  ? 'Aucun résultat pour votre recherche'
-                  : 'Essayez de modifier vos critères de recherche'}
-              </Text>
-              {(searchQuery || selectedCategory) && (
-                <TouchableOpacity 
-                  style={styles.resetButton}
-                  onPress={() => {
-                    setSearchQuery('');
-                    setSelectedCategory(null);
-                  }}
-                >
-                  <Text style={styles.resetButtonText}>Réinitialiser les filtres</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          }
-        />
+            ) : (
+              renderListingsGrid()
+            )}
+          </View>
+        </ScrollView>
+        </View>
       )}
       {/* Price Filter Modal */}
       <Modal
@@ -508,6 +753,74 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* Radius Selector Modal */}
+      <Modal
+        visible={showRadiusModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRadiusModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowRadiusModal(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalContent}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.modalTitle}>{t('home.searchRadius')}</Text>
+            
+            <View style={styles.filterSection}>
+              <TouchableOpacity 
+                style={[styles.radiusOption, searchRadius === null && styles.radiusOptionActive]}
+                onPress={() => {
+                  setSearchRadius(null);
+                  setShowRadiusModal(false);
+                }}
+              >
+                <Text style={[styles.radiusOptionText, searchRadius === null && styles.radiusOptionTextActive]}>
+                  {t('home.allListings')}
+                </Text>
+              </TouchableOpacity>
+              
+              {[5, 10, 25, 50, 100].map((radius) => (
+                <TouchableOpacity 
+                  key={radius}
+                  style={[styles.radiusOption, searchRadius === radius && styles.radiusOptionActive]}
+                  onPress={() => {
+                    setSearchRadius(radius);
+                    setShowRadiusModal(false);
+                  }}
+                >
+                  <Text style={[styles.radiusOptionText, searchRadius === radius && styles.radiusOptionTextActive]}>
+                    {t('home.within')} {radius} km
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* City Picker Modal */}
+      <CityPickerModal
+        visible={showCityPicker}
+        onClose={() => setShowCityPicker(false)}
+        onSelect={(city) => {
+          setManualLocation(city.name, {
+            latitude: city.latitude,
+            longitude: city.longitude,
+          });
+          setShowCityPicker(false);
+        }}
+        onDetectLocation={() => {
+          refreshLocation();
+          setShowCityPicker(false);
+        }}
+      />
       </View>
     </SafeAreaView>
   );
@@ -526,6 +839,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingTop: 16,
     paddingBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   topBar: {
     flexDirection: 'row',
@@ -574,7 +892,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 24,
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   searchContainer: {
     flex: 1,
@@ -586,6 +904,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
+  locationRow: {
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
   searchInput: {
     flex: 1,
     fontSize: 16,
@@ -595,13 +917,14 @@ const styles = StyleSheet.create({
   sortButton: {
     width: 56,
     height: 56,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   categoriesList: {
     marginBottom: 12,
+    paddingLeft: 24,
   },
   categoriesContainer: {
     paddingHorizontal: 24,
@@ -614,7 +937,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   categoryChipActive: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
   },
   categoryChipText: {
     fontSize: 15,
@@ -625,14 +948,21 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   listingsContainer: {
+    paddingTop: 20,
     paddingBottom: 100,
   },
   row: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
   },
   listingCardContainer: {
     width: '48%',
+    marginBottom: 16,
+  },
+  featuredContainer: {
+    width: '100%',
+    paddingHorizontal: 16,
     marginBottom: 16,
   },
   loadingContainer: {
@@ -669,7 +999,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   resetButton: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
@@ -758,7 +1088,7 @@ const styles = StyleSheet.create({
   },
   sortOptionActive: {
     backgroundColor: '#f0fdf4',
-    borderColor: '#9bbd1f',
+    borderColor: Colors.primary,
   },
   sortOptionText: {
     fontSize: 15,
@@ -766,7 +1096,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   sortOptionTextActive: {
-    color: '#9bbd1f',
+    color: Colors.primary,
   },
   modalActions: {
     flexDirection: 'row',
@@ -790,7 +1120,7 @@ const styles = StyleSheet.create({
   },
   applyButton: {
     flex: 1,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
@@ -800,5 +1130,75 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  locationSelectorContainer: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  locationSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  locationTextContainer: {
+    flex: 1,
+  },
+  locationLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 2,
+  },
+  locationText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  radiusInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  radiusText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  radiusSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  radiusOption: {
+    backgroundColor: '#f8fafc',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  radiusOptionActive: {
+    backgroundColor: '#f0fdf4',
+    borderColor: Colors.primary,
+  },
+  radiusOptionText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  radiusOptionTextActive: {
+    color: Colors.primary,
+    fontWeight: '600',
   },
 });

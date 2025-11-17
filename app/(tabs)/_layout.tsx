@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { View, StyleSheet, Platform, Text } from 'react-native';
 import { Home, Plus, User, MessageCircle } from 'lucide-react-native';
 import { useMessages } from '@/contexts/MessagesContext';
+import Colors from '@/constants/Colors';
 
 export default function TabLayout() {
   const { unreadCount } = useMessages();
@@ -127,10 +128,10 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,

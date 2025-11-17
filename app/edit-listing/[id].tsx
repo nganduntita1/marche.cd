@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
+View,
   Text,
   TextInput,
   TouchableOpacity,
@@ -20,6 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Camera, FileText, Tag, DollarSign, X, Check } from 'lucide-react-native';
+import Colors from '@/constants/Colors';
 
 export default function EditListingScreen() {
   const { id } = useLocalSearchParams();
@@ -215,7 +216,7 @@ export default function EditListingScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.container}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#9bbd1f" />
+            <ActivityIndicator size="large" color={Colors.primary} />
             <Text style={styles.loadingText}>Chargement...</Text>
           </View>
         </View>
@@ -247,7 +248,7 @@ export default function EditListingScreen() {
           {/* Images */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <Camera size={18} color="#9bbd1f" />
+              <Camera size={18} color={Colors.primary} />
               <Text style={styles.label}>Images (max 5) *</Text>
             </View>
             <Text style={styles.labelHint}>Ajoutez des photos de qualité pour attirer plus d'acheteurs</Text>
@@ -282,7 +283,7 @@ export default function EditListingScreen() {
           {/* Title */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <FileText size={18} color="#9bbd1f" />
+              <FileText size={18} color={Colors.primary} />
               <Text style={styles.label}>Titre *</Text>
             </View>
             <View style={styles.inputContainer}>
@@ -301,7 +302,7 @@ export default function EditListingScreen() {
           {/* Category */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <Tag size={18} color="#9bbd1f" />
+              <Tag size={18} color={Colors.primary} />
               <Text style={styles.label}>Catégorie *</Text>
             </View>
             <TouchableOpacity style={styles.selectContainer} onPress={() => setShowCategoryModal(true)}>
@@ -317,7 +318,7 @@ export default function EditListingScreen() {
           {/* Description */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <FileText size={18} color="#9bbd1f" />
+              <FileText size={18} color={Colors.primary} />
               <Text style={styles.label}>Description *</Text>
             </View>
             <Text style={styles.labelHint}>Décrivez l'état, les caractéristiques et les détails importants</Text>
@@ -340,7 +341,7 @@ export default function EditListingScreen() {
           {/* Price */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <DollarSign size={18} color="#9bbd1f" />
+              <DollarSign size={18} color={Colors.primary} />
               <Text style={styles.label}>Prix (USD) *</Text>
             </View>
             <View style={styles.inputContainer}>
@@ -368,7 +369,7 @@ export default function EditListingScreen() {
               colors={
                 (isSubmitting || !title || !category || !description || !price || images.length === 0)
                   ? ['#94a3b8', '#64748b']
-                  : ['#9bbd1f', '#7da01a']
+                  : [Colors.primary, '#7da01a']
               }
               style={styles.submitButtonGradient}
             >
@@ -393,7 +394,7 @@ export default function EditListingScreen() {
             >
               <View style={styles.modalHeader}>
                 <View style={styles.modalHeaderText}>
-                  <Tag size={24} color="#9bbd1f" />
+                  <Tag size={24} color={Colors.primary} />
                   <View style={styles.modalTitleContainer}>
                     <Text style={styles.modalTitle}>Choisir une catégorie</Text>
                     <Text style={styles.modalSubtitle}>Sélectionnez la catégorie qui correspond le mieux</Text>
@@ -415,7 +416,7 @@ export default function EditListingScreen() {
                     </Text>
                     {category === item.value && (
                       <View style={styles.checkmarkContainer}>
-                        <Check size={20} color="#9bbd1f" strokeWidth={3} />
+                        <Check size={20} color={Colors.primary} strokeWidth={3} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -644,7 +645,7 @@ const styles = StyleSheet.create({
   submitButton: {
     borderRadius: 16,
     marginTop: 24,
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -736,7 +737,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   categoryItemTextSelected: { 
-    color: '#9bbd1f', 
+    color: Colors.primary, 
     fontWeight: '600' 
   },
   checkmarkContainer: {

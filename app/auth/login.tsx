@@ -15,6 +15,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Mail, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import Colors from '@/constants/Colors';
+import { TextStyles } from '@/constants/Typography';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -55,20 +57,30 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <LinearGradient
-            colors={['#9bbd1f', '#bedc39']}
+            colors={['#60c882', Colors.primary, '#c7f9cc', '#00a85d', '#60c882']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            locations={[0, 0.25, 0.5, 0.75, 1]}
             style={styles.gradientHeader}
           >
-            <Image 
-              source={require('@/assets/images/logo.png')} 
-              style={styles.logo} 
-              resizeMode="contain" 
-            />
-            <View style={styles.welcomeContainer}>
-              <Text style={styles.welcomeText}>Bienvenue sur</Text>
-            </View>
-            <Text style={styles.subtitle}>
-              Votre marketplace local pour acheter et vendre au Congo
-            </Text>
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.15)', 'transparent', 'rgba(255, 255, 255, 0.1)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.meshOverlay}
+            >
+              <Image 
+                source={require('@/assets/images/logo.png')} 
+                style={styles.logo} 
+                resizeMode="contain" 
+              />
+              <View style={styles.welcomeContainer}>
+                <Text style={styles.welcomeText}>Bienvenue sur</Text>
+              </View>
+              <Text style={styles.subtitle}>
+                Votre marketplace local pour acheter et vendre au Congo
+              </Text>
+            </LinearGradient>
           </LinearGradient>
 
           <View style={styles.form}>
@@ -154,11 +166,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   gradientHeader: {
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+  },
+  meshOverlay: {
     paddingHorizontal: 24,
     paddingTop: 40,
     paddingBottom: 48,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
   },
   logo: {
     width: 180,
@@ -169,17 +184,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   welcomeText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#fff',
+    ...TextStyles.h4,
+    color: '#000000',
     marginBottom: 12,
-    opacity: 0.95,
   },
   subtitle: {
+    ...TextStyles.body,
     fontSize: 15,
-    color: '#fff',
+    color: '#000000',
     lineHeight: 22,
-    opacity: 0.9,
+    opacity: 0.85,
   },
   form: {
     padding: 24,
@@ -190,7 +204,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    fontWeight: '600',
     marginBottom: 12,
     color: '#1e293b',
   },
@@ -215,12 +228,12 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -10 }],
   },
   button: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
     marginTop: 8,
-    shadowColor: '#9bbd1f',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -231,6 +244,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+    ...TextStyles.button,
     fontSize: 17,
     fontWeight: '700',
   },
@@ -239,11 +253,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   linkText: {
+    ...TextStyles.body,
     fontSize: 15,
     color: '#64748b',
   },
   linkBold: {
-    color: '#9bbd1f',
+    color: Colors.primary,
     fontWeight: '700',
   },
   errorContainer: {
@@ -258,5 +273,11 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 14,
     fontWeight: '500',
+  },
+  hint: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 6,
+    fontStyle: 'italic',
   },
 });

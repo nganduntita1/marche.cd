@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
+import Colors from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
@@ -27,8 +28,6 @@ import {
   LogOut,
   Mail,
   Lock,
-  Eye,
-  EyeOff,
   Star,
   Share2,
   FileText,
@@ -38,10 +37,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { useTranslation } from 'react-i18next';
+import i18n from '../lib/i18n';
+import { TextStyles } from '@/constants/Typography';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const { t } = useTranslation();
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [messageAlerts, setMessageAlerts] = useState(true);
@@ -75,10 +78,11 @@ export default function SettingsScreen() {
     try {
       await AsyncStorage.setItem('app_language', newLanguage);
       setLanguage(newLanguage);
+      i18n.changeLanguage(newLanguage);
       setShowLanguageModal(false);
-      Alert.alert('Succès', 'Langue mise à jour. Redémarrez l\'app pour voir les changements.');
+      Alert.alert(t('success'), t('language_updated'));
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de changer la langue');
+      Alert.alert(t('error'), t('language_change_failed'));
     }
   };
 
@@ -205,7 +209,7 @@ export default function SettingsScreen() {
     >
       <View style={styles.settingItemLeft}>
         <View style={styles.iconContainer}>
-          <Icon size={20} color="#9bbd1f" strokeWidth={2} />
+          <Icon size={20} color={Colors.primary} strokeWidth={2} />
         </View>
         <View style={styles.settingItemText}>
           <Text style={styles.settingItemTitle}>{title}</Text>
@@ -238,7 +242,7 @@ export default function SettingsScreen() {
         <Switch
           value={value}
           onValueChange={onValueChange}
-          trackColor={{ false: '#e2e8f0', true: '#9bbd1f' }}
+          trackColor={{ false: '#e2e8f0', true: Colors.primary }}
           thumbColor="#fff"
         />
       }
@@ -253,29 +257,29 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <ArrowLeft size={24} color="#1e293b" strokeWidth={2} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Paramètres</Text>
+          <Text style={styles.headerTitle}>{t('settings')}</Text>
           <View style={styles.placeholder} />
         </View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {/* Account Section */}
-          <SettingSection title="Compte">
+          <SettingSection title={t('account')}>
             <SettingItem
               icon={User}
-              title="Modifier le profil"
-              subtitle="Nom, photo, téléphone, ville"
+              title={t('edit_profile')}
+              subtitle={t('edit_profile_subtitle')}
               onPress={() => router.push('/edit-profile')}
             />
             <SettingItem
               icon={Mail}
-              title="Email"
-              subtitle={user?.email || 'Non défini'}
-              onPress={() => Alert.alert('Info', 'Contactez le support pour changer votre email')}
+              title={t('email')}
+              subtitle={user?.email || t('not_defined')}
+              onPress={() => Alert.alert(t('info'), t('contact_support_change_email'))}
             />
             <SettingItem
               icon={Lock}
-              title="Changer le mot de passe"
-              subtitle="Sécurisez votre compte"
+              title={t('change_password')}
+              subtitle={t('secure_account')}
               onPress={() => setShowPasswordModal(true)}
             />
             {/* TODO: Implement 2FA
@@ -289,42 +293,42 @@ export default function SettingsScreen() {
           </SettingSection>
 
           {/* Notifications Section */}
-          <SettingSection title="Notifications">
+          <SettingSection title={t('notifications')}>
             <ToggleItem
               icon={Bell}
-              title="Notifications push"
-              subtitle="Recevoir des notifications sur votre appareil"
+              title={t('push_notifications')}
+              subtitle={t('push_notifications_subtitle')}
               value={pushNotifications}
               onValueChange={setPushNotifications}
             />
             <ToggleItem
               icon={Mail}
-              title="Notifications email"
-              subtitle="Recevoir des emails pour les mises à jour"
+              title={t('email_notifications')}
+              subtitle={t('email_notifications_subtitle')}
               value={emailNotifications}
               onValueChange={setEmailNotifications}
             />
             <ToggleItem
               icon={Bell}
-              title="Alertes de messages"
-              subtitle="Notifications pour les nouveaux messages"
+              title={t('message_alerts')}
+              subtitle={t('message_alerts_subtitle')}
               value={messageAlerts}
               onValueChange={setMessageAlerts}
             />
           </SettingSection>
 
           {/* Preferences Section */}
-          <SettingSection title="Préférences">
+          <SettingSection title={t('preferences')}>
             <SettingItem
               icon={Globe}
-              title="Langue"
-              subtitle={language === 'fr' ? 'Français' : 'English'}
+              title={t('language')}
+              subtitle={language === 'fr' ? t('language_french') : t('language_english')}
               onPress={() => setShowLanguageModal(true)}
             />
             <ToggleItem
               icon={Moon}
-              title="Mode sombre"
-              subtitle="Bientôt disponible"
+              title={t('dark_mode')}
+              subtitle={t('dark_mode_soon')}
               value={darkMode}
               onValueChange={handleDarkModeToggle}
             />
@@ -339,72 +343,72 @@ export default function SettingsScreen() {
           </SettingSection>
 
           {/* Support Section */}
-          <SettingSection title="Support & Aide">
+          <SettingSection title={t('support_help')}>
             <SettingItem
               icon={HelpCircle}
-              title="Centre d'aide"
-              subtitle="FAQ et guides"
+              title={t('help_center')}
+              subtitle={t('faq_guides')}
               onPress={() => router.push('/help-center')}
             />
             <SettingItem
               icon={Mail}
-              title="Contacter le support"
-              subtitle="Besoin d'aide ? Contactez-nous"
+              title={t('contact_support')}
+              subtitle={t('need_help_contact')}
               onPress={handleContactSupport}
             />
             <SettingItem
               icon={FileText}
-              title="Conditions d'utilisation"
+              title={t('terms_of_use')}
               onPress={() => router.push('/terms')}
             />
             <SettingItem
               icon={Shield}
-              title="Politique de confidentialité"
+              title={t('privacy_policy')}
               onPress={() => router.push('/privacy')}
             />
           </SettingSection>
 
           {/* App Info Section */}
-          <SettingSection title="À propos">
+          <SettingSection title={t('about')}>
             <SettingItem
               icon={Info}
-              title="Version de l'application"
+              title={t('app_version')}
               subtitle={`v${appVersion}`}
               showArrow={false}
             />
             <SettingItem
               icon={Star}
-              title="Noter l'application"
-              subtitle="Aidez-nous à nous améliorer"
+              title={t('rate_app')}
+              subtitle={t('help_us_improve')}
               onPress={handleRateApp}
             />
             <SettingItem
               icon={Share2}
-              title="Partager l'application"
-              subtitle="Invitez vos amis"
+              title={t('share_app')}
+              subtitle={t('invite_friends')}
               onPress={handleShareApp}
             />
           </SettingSection>
 
           {/* Danger Zone */}
-          <SettingSection title="Zone de danger">
+          <SettingSection title={t('danger_zone')}>
             <SettingItem
               icon={LogOut}
-              title="Se déconnecter"
+              title={t('sign_out')}
               onPress={handleSignOut}
             />
             <SettingItem
               icon={Trash2}
-              title="Supprimer le compte"
-              subtitle="Action irréversible"
+              title={t('delete_account')}
+              subtitle={t('irreversible_action')}
               onPress={handleDeleteAccount}
             />
           </SettingSection>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Marché.cd</Text>
+            <Text style={styles.footerText}>{t('app_name')}</Text>
             <Text style={styles.footerSubtext}>
-              Votre marketplace de confiance en RDC 🇨🇩
+              {t('app_tagline')}
             </Text>
           </View>
         </ScrollView>
@@ -427,7 +431,7 @@ export default function SettingsScreen() {
               onPress={(e) => e.stopPropagation()}
             >
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Choisir la langue</Text>
+                <Text style={styles.modalTitle}>{t('choose_language')}</Text>
                 <TouchableOpacity onPress={() => setShowLanguageModal(false)}>
                   <X size={24} color="#64748b" />
                 </TouchableOpacity>
@@ -438,7 +442,7 @@ export default function SettingsScreen() {
                 onPress={() => handleLanguageChange('fr')}
               >
                 <Text style={[styles.languageText, language === 'fr' && styles.languageTextSelected]}>
-                  🇫🇷 Français
+                  🇫🇷 {t('language_french')}
                 </Text>
                 {language === 'fr' && <Text style={styles.checkmark}>✓</Text>}
               </TouchableOpacity>
@@ -448,7 +452,7 @@ export default function SettingsScreen() {
                 onPress={() => handleLanguageChange('en')}
               >
                 <Text style={[styles.languageText, language === 'en' && styles.languageTextSelected]}>
-                  🇬🇧 English Coming soon!
+                  🇬🇧 {t('language_english')}
                 </Text>
                 {language === 'en' && <Text style={styles.checkmark}>✓</Text>}
               </TouchableOpacity>
@@ -474,17 +478,17 @@ export default function SettingsScreen() {
               onPress={(e) => e.stopPropagation()}
             >
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Changer le mot de passe</Text>
+                <Text style={styles.modalTitle}>{t('change_password')}</Text>
                 <TouchableOpacity onPress={() => setShowPasswordModal(false)}>
                   <X size={24} color="#64748b" />
                 </TouchableOpacity>
               </View>
 
               <View style={styles.passwordForm}>
-                <Text style={styles.inputLabel}>Nouveau mot de passe</Text>
+                <Text style={styles.inputLabel}>{t('new_password')}</Text>
                 <TextInput
                   style={styles.passwordInput}
-                  placeholder="Minimum 6 caractères"
+                  placeholder={t('minimum_6_characters')}
                   placeholderTextColor="#94a3b8"
                   value={newPassword}
                   onChangeText={setNewPassword}
@@ -492,10 +496,10 @@ export default function SettingsScreen() {
                   autoCapitalize="none"
                 />
 
-                <Text style={styles.inputLabel}>Confirmer le mot de passe</Text>
+                <Text style={styles.inputLabel}>{t('confirm_password')}</Text>
                 <TextInput
                   style={styles.passwordInput}
-                  placeholder="Retapez le mot de passe"
+                  placeholder={t('retype_password')}
                   placeholderTextColor="#94a3b8"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
@@ -507,7 +511,7 @@ export default function SettingsScreen() {
                   style={styles.changePasswordButton}
                   onPress={handlePasswordChange}
                 >
-                  <Text style={styles.changePasswordButtonText}>Changer le mot de passe</Text>
+                  <Text style={styles.changePasswordButtonText}>{t('change_password')}</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -665,11 +669,11 @@ const styles = StyleSheet.create({
   },
   languageTextSelected: {
     fontWeight: '600',
-    color: '#9bbd1f',
+    color: Colors.primary,
   },
   checkmark: {
     fontSize: 20,
-    color: '#9bbd1f',
+    color: Colors.primary,
     fontWeight: '700',
   },
   passwordForm: {
@@ -693,7 +697,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   changePasswordButton: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

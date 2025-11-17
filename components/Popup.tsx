@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Colors from '@/constants/Colors';
 
 type PopupProps = {
   visible: boolean;
@@ -21,12 +22,12 @@ export default function Popup({ visible, title, message, buttonText, onClose, on
 
   const getButtonColors = () => {
     if (title.toLowerCase().includes('crédit') || title.toLowerCase().includes('épuisé')) {
-      return ['#9bbd1f', '#7da01a'];
+      return [Colors.primary, '#7da01a'];
     }
     if (title.toLowerCase().includes('erreur')) {
       return ['#ef4444', '#dc2626'];
     }
-    return ['#9bbd1f', '#7da01a'];
+    return [Colors.primary, '#7da01a'];
   };
 
   return (

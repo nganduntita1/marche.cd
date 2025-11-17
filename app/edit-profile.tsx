@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
+View,
   Text,
   TextInput,
   TouchableOpacity,
@@ -18,6 +18,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, X } from 'lucide-react-native';
+import Colors from '@/constants/Colors';
+import { TextStyles } from '@/constants/Typography';
 
 export default function EditProfileScreen() {
   const [name, setName] = useState('');
@@ -215,6 +217,16 @@ export default function EditProfileScreen() {
           </View>
 
           <View style={styles.formCard}>
+            {user?.email?.includes('@marchecd.com') && (
+              <View style={styles.generatedEmailInfo}>
+                <Text style={styles.generatedEmailLabel}>Email de connexion généré</Text>
+                <Text style={styles.generatedEmailValue}>{user.email}</Text>
+                <Text style={styles.generatedEmailHint}>
+                  Cet email a été créé automatiquement pour votre compte
+                </Text>
+              </View>
+            )}
+
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Nom complet *</Text>
               <TextInput
@@ -227,7 +239,7 @@ export default function EditProfileScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Numéro WhatsApp</Text>
+              <Text style={styles.label}>Numéro de téléphone</Text>
               <TextInput
                 style={styles.input}
                 placeholder="+243..."
@@ -236,6 +248,9 @@ export default function EditProfileScreen() {
                 keyboardType="phone-pad"
                 placeholderTextColor="#94a3b8"
               />
+              <Text style={styles.hint}>
+                Utilisé pour la connexion et les contacts
+              </Text>
             </View>
 
             <View style={styles.inputGroup}>
@@ -329,7 +344,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -356,7 +371,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
@@ -410,7 +425,7 @@ const styles = StyleSheet.create({
     color: '#1e293b',
   },
   saveButton: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -437,5 +452,36 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
+  },
+  generatedEmailInfo: {
+    backgroundColor: '#e0f2fe',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  generatedEmailLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0369a1',
+    marginBottom: 6,
+  },
+  generatedEmailValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0c4a6e',
+    marginBottom: 6,
+  },
+  generatedEmailHint: {
+    fontSize: 12,
+    color: '#0369a1',
+    fontStyle: 'italic',
+  },
+  hint: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 6,
+    fontStyle: 'italic',
   },
 });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
+View,
   Text,
   FlatList,
   TouchableOpacity,
@@ -14,6 +14,7 @@ import { MessageCircle } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Conversation } from '@/types/chat';
+import Colors from '@/constants/Colors';
 
 export default function ConversationsScreen() {
   const { user } = useAuth();
@@ -161,7 +162,7 @@ export default function ConversationsScreen() {
           />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#9bbd1f" />
+          <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -206,7 +207,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    backgroundColor: '#bedc39',
+    backgroundColor: '#a8f5b8',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
     alignItems: 'center',
@@ -247,7 +248,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   button: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

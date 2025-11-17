@@ -9,7 +9,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string, phone?: string, location?: string) => Promise<void>;
   signOut: () => Promise<void>;
   loadUserProfile: (userId: string) => Promise<void>;
   checkCredits: () => Promise<boolean>;
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, name: string, phone?: string, location?: string) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -74,6 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         options: {
           data: {
             name,
+            phone,
+            location,
           },
         },
       });
@@ -89,8 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               id: data.user.id,
               name,
               email,
-              phone: '',
-              location: '',
+              phone: phone || '',
+              location: location || '',
               is_verified: false,
               credits: 1, // Start with 1 free credit
               total_spent: 0,

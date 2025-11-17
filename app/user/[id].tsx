@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
+View,
   Text,
   TouchableOpacity,
   StyleSheet,
@@ -15,6 +15,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Star, MapPin } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import Colors from '@/constants/Colors';
+import { TextStyles } from '@/constants/Typography';
 
 type UserProfile = {
   id: string;
@@ -218,7 +220,7 @@ export default function UserProfileScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#9bbd1f" />
+          <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -468,7 +470,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -515,7 +517,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   rateButton: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 12,
@@ -577,7 +579,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     flex: 1,
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
@@ -625,7 +627,7 @@ const styles = StyleSheet.create({
   listingPrice: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#9bbd1f',
+    color: Colors.primary,
     marginBottom: 8,
   },
   listingMeta: {
@@ -701,7 +703,7 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
   },
   button: {
-    backgroundColor: '#9bbd1f',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 12,
