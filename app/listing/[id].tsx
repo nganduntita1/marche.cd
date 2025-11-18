@@ -157,11 +157,7 @@ export default function ListingDetailScreen() {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-    }).format(price);
+    return `$${price.toLocaleString('en-US')}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -757,7 +753,7 @@ export default function ListingDetailScreen() {
           </View>
           <View style={styles.footer}>
             <View style={styles.priceSection}>
-              <Text style={styles.footerPrice}>${listing.price.toLocaleString()}</Text>
+              <Text style={styles.footerPrice}>${listing.price.toLocaleString('en-US')}</Text>
               <Text style={styles.deliveryText}>Votre annonce</Text>
             </View>
             
@@ -990,7 +986,7 @@ export default function ListingDetailScreen() {
         visible={showShareModal}
         onClose={() => setShowShareModal(false)}
         title={listing?.title || ''}
-        url={`https://marche.cd/listing/${id}`}
+        url={`https://marchecd.tech/listing/${id}`}
         type="listing"
       />
 

@@ -237,7 +237,7 @@ export default function ListingCard({
         <View style={styles.footer}>
           <View style={styles.priceContainer}>
             <Text style={styles.price}>
-              {price.toLocaleString('fr-FR')} $
+              ${price.toLocaleString('en-US')}
             </Text>
           </View>
           

@@ -1,0 +1,12 @@
+# Build artifacts
+*.apk
+*.aab
+*.ipa
+
+# Documentation
+*.md
+
+# Large folders
+.git
+.vercel
+dist

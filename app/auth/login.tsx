@@ -181,19 +181,21 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   welcomeContainer: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   welcomeText: {
-    ...TextStyles.h4,
+    fontSize: 36,
+    fontWeight: '700',
     color: '#000000',
-    marginBottom: 12,
+    marginBottom: 8,
+    fontFamily: 'Montserrat_700Bold',
   },
   subtitle: {
-    ...TextStyles.body,
-    fontSize: 15,
+    fontSize: 16,
     color: '#000000',
-    lineHeight: 22,
+    lineHeight: 24,
     opacity: 0.85,
+    fontFamily: 'Roboto_400Regular',
   },
   form: {
     padding: 24,

@@ -57,6 +57,7 @@ export default function RootLayout() {
             <MessagesProvider>
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="index" />
+                <Stack.Screen name="landing" />
                 <Stack.Screen name="auth/login" />
                 <Stack.Screen name="auth/register" />
                 <Stack.Screen name="(tabs)" />

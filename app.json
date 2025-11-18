@@ -8,6 +8,11 @@
     "scheme": "marchecd",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#00b86b"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.marche.cd",
@@ -19,7 +24,8 @@
       "package": "com.marche.cd",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#00b86b",
+        "monochromeImage": "./assets/images/icon.png"
       },
       "permissions": [
         "android.permission.RECORD_AUDIO",

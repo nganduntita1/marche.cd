@@ -320,7 +320,7 @@ export default function UserProfileScreen() {
                   <Text style={styles.listingTitle} numberOfLines={2}>
                     {listing.title}
                   </Text>
-                  <Text style={styles.listingPrice}>${listing.price}</Text>
+                  <Text style={styles.listingPrice}>${listing.price.toLocaleString('en-US')}</Text>
                   <View style={styles.listingMeta}>
                     <Text style={[
                       styles.listingStatus,

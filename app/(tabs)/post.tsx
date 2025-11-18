@@ -17,7 +17,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 import { supabase } from '@/lib/supabase';
 import Popup from '@/components/Popup';
 import { Camera, FileText, Tag, DollarSign, X, Check, MapPin, Navigation } from 'lucide-react-native';
@@ -185,34 +184,42 @@ export default function PostScreen() {
           gif: 'image/gif',
           webp: 'image/webp',
         };
-        return mimeTypes[extension] || 'image/jpeg'; // Default to JPEG
+        return mimeTypes[extension] || 'image/jpeg';
       };
 
       // ---------- IMAGE UPLOAD ----------
       const imageUrls = await Promise.all(
         images.map(async (uri, idx) => {
           try {
-            const mimeType = getMimeType(uri);
             const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
             const fileName = `${user.id}/${Date.now()}-${idx}.${ext}`;
+            const mimeType = getMimeType(uri);
 
-            console.log(`Uploading image: ${fileName}, MIME type: ${mimeType}`);
+            console.log(`Uploading image ${idx + 1}: ${fileName}`);
 
-            // Fetch the file and convert to ArrayBuffer
-            const response = await fetch(uri);
-            const blob = await response.blob();
-            const arrayBuffer = await blob.arrayBuffer();
+            let fileData: any;
+
+            if (Platform.OS === 'web') {
+              // Web: use fetch to get blob
+              const response = await fetch(uri);
+              fileData = await response.blob();
+            } else {
+              // React Native: use ArrayBuffer approach
+              const response = await fetch(uri);
+              const arrayBuffer = await response.arrayBuffer();
+              fileData = arrayBuffer;
+            }
 
             const { error: uploadError } = await supabase.storage
               .from('listings')
-              .upload(fileName, arrayBuffer, {
+              .upload(fileName, fileData, {
                 contentType: mimeType,
                 cacheControl: '3600',
                 upsert: false,
               });
 
             if (uploadError) {
-              console.error('Upload error details:', uploadError);
+              console.error('Upload error:', uploadError);
               throw uploadError;
             }
 
@@ -220,10 +227,11 @@ export default function PostScreen() {
               .from('listings')
               .getPublicUrl(fileName);
 
+            console.log(`Image ${idx + 1} uploaded successfully`);
             return urlData.publicUrl;
           } catch (error: any) {
-            console.error('Image upload error:', error);
-            throw new Error(`Failed to upload image ${idx + 1}: ${error.message}`);
+            console.error(`Image ${idx + 1} upload error:`, error);
+            throw new Error(`Échec du téléchargement de l'image ${idx + 1}: ${error.message}`);
           }
         })
       );
@@ -772,6 +780,7 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     backgroundColor: '#f8fafc',
     color: '#1e293b',
+    width: '100%',
   },
   locationButton: {
     width: 48,
@@ -785,7 +794,9 @@ const styles = StyleSheet.create({
   },
   textArea: { 
     minHeight: 120,
+    maxHeight: 200,
     textAlignVertical: 'top',
+    paddingTop: 14,
   },
   characterCount: {
     fontSize: 12,

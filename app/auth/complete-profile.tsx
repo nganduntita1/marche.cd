@@ -96,7 +96,7 @@ export default function CompleteProfileScreen() {
                 <Text style={styles.welcomeText}>Complétez votre profil</Text>
               </View>
               <Text style={styles.subtitle}>
-                Ajoutez vos informations pour commencer à vendre sur Marche.cd
+                Ajoutez vos informations pour commencer à vendre sur Marche CD
               </Text>
             </LinearGradient>
           </LinearGradient>

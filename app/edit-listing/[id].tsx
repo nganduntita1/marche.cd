@@ -17,7 +17,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Camera, FileText, Tag, DollarSign, X, Check } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
@@ -148,37 +147,41 @@ export default function EditListingScreen() {
           try {
             const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
             const fileName = `${user!.id}/${Date.now()}-${idx}.${ext}`;
+            const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
-            let fileData;
+            let fileData: any;
 
             if (Platform.OS === 'web') {
               const response = await fetch(uri);
               fileData = await response.blob();
             } else {
-              const base64 = await FileSystem.readAsStringAsync(uri, {
-                encoding: FileSystem.EncodingType.Base64,
-              });
-              fileData = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+              // React Native: use ArrayBuffer
+              const response = await fetch(uri);
+              fileData = await response.arrayBuffer();
             }
 
             const { error: uploadError } = await supabase.storage
               .from('listings')
               .upload(fileName, fileData, {
-                contentType: `image/${ext}`,
+                contentType: mimeType,
                 cacheControl: '3600',
                 upsert: false,
               });
 
-            if (uploadError) throw uploadError;
+            if (uploadError) {
+              console.error('Upload error:', uploadError);
+              throw uploadError;
+            }
 
             const { data: urlData } = supabase.storage
               .from('listings')
               .getPublicUrl(fileName);
 
+            console.log(`Image ${idx + 1} uploaded successfully`);
             return urlData.publicUrl;
           } catch (error: any) {
-            console.error('Image upload error:', error);
-            throw new Error(`Failed to upload image ${idx + 1}: ${error.message}`);
+            console.error(`Image ${idx + 1} upload error:`, error);
+            throw new Error(`Échec du téléchargement de l'image ${idx + 1}: ${error.message}`);
           }
         })
       );

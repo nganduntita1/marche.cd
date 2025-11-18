@@ -63,7 +63,7 @@ export default function FeaturedListingCard({
         </Text>
         
         <View style={styles.footer}>
-          <Text style={styles.price}>${price.toLocaleString()}</Text>
+          <Text style={styles.price}>${price.toLocaleString('en-US')}</Text>
           {location && (
             <View style={styles.locationContainer}>
               <MapPin size={14} color={Colors.textLight} />

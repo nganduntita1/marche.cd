@@ -306,7 +306,7 @@ export default function RegisterScreen() {
               <Text style={styles.checkboxText}>
                 J'accepte les{' '}
                 <Text style={styles.checkboxLink}>Conditions d'utilisation</Text> et la{' '}
-                <Text style={styles.checkboxLink}>Politique de confidentialité</Text> de Marche.cd.
+                <Text style={styles.checkboxLink}>Politique de confidentialité</Text> de Marche CD.
               </Text>
             </TouchableOpacity>
 
@@ -359,18 +359,21 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   welcomeContainer: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   welcomeText: {
-    ...TextStyles.h4,
+    fontSize: 36,
+    fontWeight: '700',
     color: '#000000',
-    marginBottom: 12,
+    marginBottom: 8,
+    fontFamily: 'Montserrat_700Bold',
   },
   subtitle: {
-    ...TextStyles.body,
-    fontSize: 15,
+    fontSize: 16,
     color: '#000000',
+    lineHeight: 24,
     opacity: 0.85,
+    fontFamily: 'Roboto_400Regular',
   },
   form: {
     padding: 24,

@@ -497,7 +497,7 @@ export default function ChatScreen() {
           )}
           {!isMyMessage && !showAvatar && <View style={styles.avatarSpacer} />}
           
-          <View style={styles.messageWrapper}>
+          <View style={[styles.messageWrapper, isMyMessage && styles.myMessageWrapper]}>
             <View
               style={[
                 styles.messageBubble,
@@ -599,7 +599,7 @@ export default function ChatScreen() {
               {conversation.listing.title}
             </Text>
             <Text style={styles.listingPreviewPrice}>
-              ${conversation.listing.price.toLocaleString()}
+              ${conversation.listing.price.toLocaleString('en-US')}
             </Text>
           </View>
           <View style={styles.listingPreviewArrow}>
@@ -638,6 +638,9 @@ export default function ChatScreen() {
           contentContainerStyle={styles.messagesList}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+          }}
           onContentSizeChange={() => {
             if (messages.length > 0) {
               flatListRef.current?.scrollToEnd({ animated: false });
@@ -820,7 +823,8 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   dateSeparatorContainer: {
     alignItems: 'center',
@@ -833,16 +837,17 @@ const styles = StyleSheet.create({
   },
   messageContainer: {
     marginBottom: 8,
-    maxWidth: '75%',
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
   myMessage: {
     alignSelf: 'flex-end',
     marginLeft: 'auto',
+    maxWidth: '75%',
   },
   otherMessage: {
     alignSelf: 'flex-start',
+    maxWidth: '75%',
   },
   avatarPlaceholder: {
     width: 32,
@@ -870,6 +875,9 @@ const styles = StyleSheet.create({
   messageWrapper: {
     flex: 1,
     alignItems: 'flex-start',
+  },
+  myMessageWrapper: {
+    alignItems: 'flex-end',
   },
   messageBubble: {
     borderRadius: 20,
@@ -917,8 +925,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    paddingBottom: 8,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'android' ? 20 : 20,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e5e5ea',

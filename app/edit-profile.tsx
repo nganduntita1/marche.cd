@@ -19,7 +19,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, X } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
-import { TextStyles } from '@/constants/Typography';
 
 export default function EditProfileScreen() {
   const [name, setName] = useState('');
@@ -49,7 +48,7 @@ export default function EditProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -65,17 +64,25 @@ export default function EditProfileScreen() {
 
     setUploading(true);
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const arrayBuffer = await new Response(blob).arrayBuffer();
-      
       const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const mimeType = `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`;
 
-      const { data, error } = await supabase.storage
+      let fileData: any;
+
+      if (Platform.OS === 'web') {
+        const response = await fetch(uri);
+        fileData = await response.blob();
+      } else {
+        // React Native: use ArrayBuffer
+        const response = await fetch(uri);
+        fileData = await response.arrayBuffer();
+      }
+
+      const { error } = await supabase.storage
         .from('profile-pictures')
-        .upload(fileName, arrayBuffer, {
-          contentType: `image/${fileExt}`,
+        .upload(fileName, fileData, {
+          contentType: mimeType,
           upsert: true,
         });
 
@@ -97,6 +104,7 @@ export default function EditProfileScreen() {
         .getPublicUrl(fileName);
 
       setProfilePicture(publicUrl);
+      console.log('Profile picture uploaded successfully');
     } catch (error: any) {
       console.error('Error uploading image:', error);
       Alert.alert(

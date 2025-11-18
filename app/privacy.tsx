@@ -101,7 +101,7 @@ export default function PrivacyScreen() {
             <Text style={styles.paragraph}>
               Pour toute question sur cette politique ou pour exercer vos droits, contactez-nous :{'\n\n'}
               WhatsApp : +27 67 272 7343{'\n'}
-              Email : support@marche.cd
+              Email : support@marchecd.tech
             </Text>
 
             <View style={styles.footer}>
