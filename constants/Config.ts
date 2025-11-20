@@ -23,6 +23,7 @@ export const SOCIAL_MEDIA = {
 export const STORE_LINKS = {
   playStore: '',
   appStore: '',
+  apkDownload: 'https://github.com/nganduntita1/marche.cd/releases/download/v1.0.0/marche-cd.apk',
 };
 
 // API Configuration (if needed)

@@ -489,7 +489,7 @@ export default function HomeScreen() {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -567,7 +567,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.container}>
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -947,7 +947,7 @@ const styles = StyleSheet.create({
   },
   listingsContainer: {
     paddingTop: 20,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   row: {
     flexDirection: 'row',

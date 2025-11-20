@@ -4,6 +4,7 @@ import { I18nextProvider } from 'react-i18next';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { MessagesProvider } from '@/contexts/MessagesContext';
@@ -50,24 +51,26 @@ export default function RootLayout() {
   }
 
   return (
-    <I18nextProvider i18n={i18n}>
-      <AuthProvider>
-        <LocationProvider>
-          <NotificationProvider>
-            <MessagesProvider>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="index" />
-                <Stack.Screen name="landing" />
-                <Stack.Screen name="auth/login" />
-                <Stack.Screen name="auth/register" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <StatusBar style="auto" />
-            </MessagesProvider>
-          </NotificationProvider>
-        </LocationProvider>
-      </AuthProvider>
-    </I18nextProvider>
+    <SafeAreaProvider>
+      <I18nextProvider i18n={i18n}>
+        <AuthProvider>
+          <LocationProvider>
+            <NotificationProvider>
+              <MessagesProvider>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="landing" />
+                  <Stack.Screen name="auth/login" />
+                  <Stack.Screen name="auth/register" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+                <StatusBar style="auto" />
+              </MessagesProvider>
+            </NotificationProvider>
+          </LocationProvider>
+        </AuthProvider>
+      </I18nextProvider>
+    </SafeAreaProvider>
   );
 }

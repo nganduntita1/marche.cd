@@ -11,7 +11,7 @@ View,
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Send, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
@@ -26,6 +26,7 @@ export default function ChatScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { refreshUnreadCount } = useMessages();
+  const insets = useSafeAreaInsets();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -538,7 +539,7 @@ export default function ChatScreen() {
   const otherUser = getOtherUser();
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity
@@ -653,7 +654,7 @@ export default function ChatScreen() {
           }}
         />
 
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
@@ -926,7 +927,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingTop: 8,
-    paddingBottom: Platform.OS === 'android' ? 20 : 20,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e5e5ea',

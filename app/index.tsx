@@ -11,7 +11,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Search, Heart, Bell, SlidersHorizontal, Package } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +22,7 @@ import Colors from '@/constants/Colors';
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [listings, setListings] = useState<ListingWithDetails[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -136,7 +137,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -240,7 +241,7 @@ export default function HomeScreen() {
 
         {/* Bottom Banner - Not Logged In */}
         {!user && (
-          <View style={styles.bottomBanner}>
+          <View style={[styles.bottomBanner, { paddingBottom: Math.max(insets.bottom, 12) }]}>
             <View style={styles.bannerContent}>
               <Text style={styles.bannerText}>Connectez-vous pour publier et interagir</Text>
               <TouchableOpacity 

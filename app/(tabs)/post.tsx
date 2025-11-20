@@ -280,7 +280,7 @@ export default function PostScreen() {
   // -------------------------------------------------------------------------
   if (!user) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
@@ -321,7 +321,7 @@ export default function PostScreen() {
 
   if (!user.phone || !user.location) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
@@ -361,7 +361,7 @@ export default function PostScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.container}>
       <ScrollView 
         style={styles.scrollView} 
@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100, // Add padding to prevent navbar overlap
+    paddingBottom: 120, // Add padding to prevent navbar overlap
   },
   formCard: {
     backgroundColor: '#fff',

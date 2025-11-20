@@ -1,17 +1,23 @@
 import { Tabs } from 'expo-router';
-import { View, StyleSheet, Platform, Text } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { Home, Plus, User, MessageCircle } from 'lucide-react-native';
 import { useMessages } from '@/contexts/MessagesContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Colors from '@/constants/Colors';
 
 export default function TabLayout() {
   const { unreadCount } = useMessages();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: {
+          ...styles.tabBar,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom,
+        },
         tabBarActiveTintColor: '#1e293b',
         tabBarInactiveTintColor: '#1e293b',
         tabBarShowLabel: false,
@@ -76,14 +82,8 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#fff',
     borderTopWidth: 0,
-    height: Platform.OS === 'ios' ? 88 : 70,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-    paddingTop: 12,
+    paddingTop: 8,
     paddingHorizontal: 20,
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.08,
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   tabBarItem: {
-    paddingTop: 4,
+    paddingTop: 0,
   },
   iconContainer: {
     width: 48,
