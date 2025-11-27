@@ -438,9 +438,9 @@ export default function ProfileScreen() {
           </View>
         </View>
         <View style={styles.creditsGrid}>
-          <CreditCard amount={10} credits={10} />
-          <CreditCard amount={25} credits={30} />
-          <CreditCard amount={75} credits={100} />
+          <CreditCard amount={5} credits={10} />
+          <CreditCard amount={12.5} credits={30} />
+          <CreditCard amount={37.5} credits={100} />
         </View>
       </View>
 

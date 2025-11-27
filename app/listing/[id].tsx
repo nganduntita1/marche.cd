@@ -53,6 +53,7 @@ export default function ListingDetailScreen() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPromoteModal, setShowPromoteModal] = useState(false);
   const [showSelectBuyerModal, setShowSelectBuyerModal] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState<string>('');
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -241,6 +242,7 @@ export default function ListingDetailScreen() {
 
     // Show safety tips for first-time conversations
     if (!existingConv) {
+      setPendingMessage(messageText); // Store the message
       setShowSafetyTipsModal(true);
       return;
     }
@@ -974,10 +976,15 @@ export default function ListingDetailScreen() {
       {/* Safety Tips Modal */}
       <SafetyTipsModal
         visible={showSafetyTipsModal}
-        onClose={() => setShowSafetyTipsModal(false)}
+        onClose={() => {
+          setShowSafetyTipsModal(false);
+          setPendingMessage(''); // Clear pending message on close
+        }}
         onProceed={() => {
-          const greeting = `Bonjour! Je suis intéressé par "${listing?.title}" et j'aimerais l'acheter.`;
-          proceedToChat(greeting);
+          // Use the pending message if available, otherwise use default greeting
+          const messageToSend = pendingMessage || `Bonjour! Je suis intéressé par "${listing?.title}" et j'aimerais l'acheter.`;
+          proceedToChat(messageToSend);
+          setPendingMessage(''); // Clear after using
         }}
       />
 
