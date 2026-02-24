@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
 View,
   Text,
@@ -26,11 +26,15 @@ import { useLocation } from '@/contexts/LocationContext';
 import { getCurrentLocation, getCityFromCoordinates } from '@/services/locationService';
 import CityPickerModal from '@/components/CityPickerModal';
 import NotificationBell from '@/components/NotificationBell';
+import { useGuidance } from '@/contexts/GuidanceContext';
+import { Tooltip, PostingGuidance } from '@/components/guidance';
 
 export default function PostScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { userLocation, currentCity } = useLocation();
+  const { shouldShowTooltip, markTooltipDismissed, markActionCompleted, incrementScreenView, getTooltipContent } = useGuidance();
+  
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -47,6 +51,18 @@ export default function PostScreen() {
   const [longitude, setLongitude] = useState<number | null>(null);
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [showCityPicker, setShowCityPicker] = useState(false);
+  
+  // Guidance state
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const guidanceRef = useRef<any>(null);
+  
+  // Refs for tooltip positioning
+  const titleInputRef = useRef<any>(null);
+  const descriptionInputRef = useRef<any>(null);
+  const priceInputRef = useRef<any>(null);
+  const categoryButtonRef = useRef<any>(null);
+  const locationInputRef = useRef<any>(null);
+  const photosRef = useRef<any>(null);
 
   const resetForm = () => {
     setTitle('');
@@ -120,8 +136,10 @@ export default function PostScreen() {
     }
   };
 
-  // Auto-detect location on mount
+  // Auto-detect location on mount and track screen view
   React.useEffect(() => {
+    incrementScreenView('post');
+    
     if (userLocation && currentCity) {
       setLatitude(userLocation.latitude);
       setLongitude(userLocation.longitude);
@@ -265,6 +283,15 @@ export default function PostScreen() {
       if (credErr) throw new Error(`Erreur de déduction de crédit: ${credErr.message}`);
 
       setNewListingId(listing.id);
+      
+      // Mark first listing action as completed
+      await markActionCompleted('first_listing_posted');
+      
+      // Trigger success celebration if this is the first listing
+      if (guidanceRef.current?.triggerSuccessCelebration) {
+        guidanceRef.current.triggerSuccessCelebration();
+      }
+      
       setShowSuccessPopup(true);
       resetForm();
     } catch (err: any) {
@@ -380,8 +407,38 @@ export default function PostScreen() {
           <Text style={styles.pageTitle}>Nouvelle annonce</Text>
           <Text style={styles.pageSubtitle}>Publiez votre article en quelques étapes</Text>
 
+          {/* Posting Guidance Component */}
+          <PostingGuidance
+            ref={guidanceRef}
+            title={title}
+            description={description}
+            price={price}
+            images={images}
+            category={category}
+            city={city}
+            onFieldFocus={(field) => {
+              // Show tooltip for the focused field
+              if (field === 'title' && shouldShowTooltip('post_title')) {
+                setActiveTooltip('post_title');
+              } else if (field === 'description' && shouldShowTooltip('post_description')) {
+                setActiveTooltip('post_description');
+              } else if (field === 'price' && shouldShowTooltip('post_price')) {
+                setActiveTooltip('post_price');
+              } else if (field === 'category' && shouldShowTooltip('post_category')) {
+                setActiveTooltip('post_category');
+              } else if (field === 'location' && shouldShowTooltip('post_location')) {
+                setActiveTooltip('post_location');
+              } else if (field === 'photos' && shouldShowTooltip('post_photo_tips')) {
+                setActiveTooltip('post_photo_tips');
+              }
+            }}
+            onFirstListingSuccess={() => {
+              markActionCompleted('first_listing_posted');
+            }}
+          />
+
           {/* Images */}
-          <View style={styles.inputGroup}>
+          <View style={styles.inputGroup} ref={photosRef}>
             <View style={styles.labelRow}>
               <Camera size={18} color={Colors.primary} />
               <Text style={styles.label}>Images (max 5) *</Text>
@@ -416,7 +473,7 @@ export default function PostScreen() {
           </View>
 
           {/* Title */}
-          <View style={styles.inputGroup}>
+          <View style={styles.inputGroup} ref={titleInputRef}>
             <View style={styles.labelRow}>
               <FileText size={18} color={Colors.primary} />
               <Text style={styles.label}>Titre *</Text>
@@ -425,7 +482,12 @@ export default function PostScreen() {
               <TextInput 
                 style={styles.input} 
                 value={title} 
-                onChangeText={setTitle} 
+                onChangeText={setTitle}
+                onFocus={() => {
+                  if (shouldShowTooltip('post_title')) {
+                    setActiveTooltip('post_title');
+                  }
+                }}
                 placeholder="ex: iPhone 11 Pro Max 256GB" 
                 placeholderTextColor="#94a3b8"
                 maxLength={100} 
@@ -435,12 +497,20 @@ export default function PostScreen() {
           </View>
 
           {/* Category */}
-          <View style={styles.inputGroup}>
+          <View style={styles.inputGroup} ref={categoryButtonRef}>
             <View style={styles.labelRow}>
               <Tag size={18} color={Colors.primary} />
               <Text style={styles.label}>Catégorie *</Text>
             </View>
-            <TouchableOpacity style={styles.selectContainer} onPress={() => setShowCategoryModal(true)}>
+            <TouchableOpacity 
+              style={styles.selectContainer} 
+              onPress={() => {
+                if (shouldShowTooltip('post_category')) {
+                  setActiveTooltip('post_category');
+                }
+                setShowCategoryModal(true);
+              }}
+            >
               <View style={styles.selectContent}>
                 <Text style={[styles.selectText, !category && styles.selectPlaceholder]}>
                   {category ? categories.find(c => c.value === category)?.label : 'Sélectionner une catégorie'}
@@ -467,7 +537,7 @@ export default function PostScreen() {
           )}
 
           {/* Description */}
-          <View style={styles.inputGroup}>
+          <View style={styles.inputGroup} ref={descriptionInputRef}>
             <View style={styles.labelRow}>
               <FileText size={18} color={Colors.primary} />
               <Text style={styles.label}>Description *</Text>
@@ -478,6 +548,11 @@ export default function PostScreen() {
                 style={[styles.input, styles.textArea]}
                 value={description}
                 onChangeText={setDescription}
+                onFocus={() => {
+                  if (shouldShowTooltip('post_description')) {
+                    setActiveTooltip('post_description');
+                  }
+                }}
                 placeholder="Décrivez votre article en détail..."
                 placeholderTextColor="#94a3b8"
                 multiline
@@ -490,7 +565,7 @@ export default function PostScreen() {
           </View>
 
           {/* Price */}
-          <View style={styles.inputGroup}>
+          <View style={styles.inputGroup} ref={priceInputRef}>
             <View style={styles.labelRow}>
               <DollarSign size={18} color={Colors.primary} />
               <Text style={styles.label}>Prix (USD) *</Text>
@@ -499,7 +574,12 @@ export default function PostScreen() {
               <TextInput 
                 style={styles.input} 
                 value={price} 
-                onChangeText={setPrice} 
+                onChangeText={setPrice}
+                onFocus={() => {
+                  if (shouldShowTooltip('post_price')) {
+                    setActiveTooltip('post_price');
+                  }
+                }}
                 placeholder="0.00" 
                 placeholderTextColor="#94a3b8"
                 keyboardType="decimal-pad" 
@@ -508,7 +588,7 @@ export default function PostScreen() {
           </View>
 
           {/* Location */}
-          <View style={styles.inputGroup}>
+          <View style={styles.inputGroup} ref={locationInputRef}>
             <View style={styles.labelRow}>
               <MapPin size={18} color={Colors.primary} />
               <Text style={styles.label}>Ville *</Text>
@@ -517,7 +597,12 @@ export default function PostScreen() {
               <TextInput 
                 style={[styles.input, { flex: 1 }]} 
                 value={city} 
-                onChangeText={setCity} 
+                onChangeText={setCity}
+                onFocus={() => {
+                  if (shouldShowTooltip('post_location')) {
+                    setActiveTooltip('post_location');
+                  }
+                }}
                 placeholder="Votre ville" 
                 placeholderTextColor="#94a3b8"
               />
@@ -625,6 +710,27 @@ export default function PostScreen() {
           router.push('/(tabs)/profile');
         }}
       />
+
+      {/* Guidance Tooltips */}
+      {activeTooltip && getTooltipContent(activeTooltip) && (
+        <Tooltip
+          content={getTooltipContent(activeTooltip)!}
+          visible={true}
+          onDismiss={() => {
+            markTooltipDismissed(activeTooltip);
+            setActiveTooltip(null);
+          }}
+          targetRef={
+            activeTooltip === 'post_title' ? titleInputRef :
+            activeTooltip === 'post_description' ? descriptionInputRef :
+            activeTooltip === 'post_price' ? priceInputRef :
+            activeTooltip === 'post_category' ? categoryButtonRef :
+            activeTooltip === 'post_location' ? locationInputRef :
+            activeTooltip === 'post_photo_tips' ? photosRef :
+            undefined
+          }
+        />
+      )}
       </View>
     </SafeAreaView>
   );

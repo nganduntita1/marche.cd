@@ -15,9 +15,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import ListingCard from '@/components/ListingCard';
 import CreditCard from '@/components/CreditCard';
-import { Bell, MapPin, Phone, Mail, Star, Package, Settings, BarChart3 } from 'lucide-react-native';
+import { Bell, MapPin, Phone, Mail, Star, Package, Settings, BarChart3, HelpCircle } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
+import { ProfileGuidance, ProgressTracker, ProfileSuggestions, RatingsExplanation, calculateProfileCompleteness } from '@/components/guidance';
+import { useTranslation } from 'react-i18next';
 
 type Listing = {
   id: string;
@@ -30,6 +32,9 @@ type Listing = {
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const router = useRouter();
   const [listings, setListings] = useState<Listing[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -37,6 +42,8 @@ export default function ProfileScreen() {
   const [notificationCount, setNotificationCount] = useState(0);
   const [ratingAverage, setRatingAverage] = useState(0);
   const [ratingCount, setRatingCount] = useState(0);
+  const [showRatingsExplanation, setShowRatingsExplanation] = useState(false);
+  const [profileCompleteness, setProfileCompleteness] = useState(0);
 
   const fetchUserListings = async () => {
     try {
@@ -64,23 +71,23 @@ export default function ProfileScreen() {
       await fetchUserListings();
     } catch (error) {
       console.error('Error marking listing as sold:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la mise à jour du statut de l\'annonce.');
+      Alert.alert(txt('Erreur', 'Error'), txt("Une erreur est survenue lors de la mise à jour du statut de l'annonce.", 'An error occurred while updating listing status.'));
     }
   };
 
   const handleDeleteListing = async (listingId: string) => {
     console.log('Delete button pressed for listing:', listingId);
     Alert.alert(
-      'Supprimer l\'annonce',
-      'Êtes-vous sûr de vouloir supprimer cette annonce ? Cette action est irréversible.',
+      txt("Supprimer l'annonce", 'Delete listing'),
+      txt('Êtes-vous sûr de vouloir supprimer cette annonce ? Cette action est irréversible.', 'Are you sure you want to delete this listing? This action cannot be undone.'),
       [
         {
-          text: 'Annuler',
+          text: txt('Annuler', 'Cancel'),
           style: 'cancel',
           onPress: () => console.log('Delete cancelled'),
         },
         {
-          text: 'Supprimer',
+          text: txt('Supprimer', 'Delete'),
           style: 'destructive',
           onPress: async () => {
             console.log('Delete confirmed, attempting to delete listing:', listingId);
@@ -98,10 +105,10 @@ export default function ProfileScreen() {
               
               console.log('Delete successful');
               await fetchUserListings();
-              Alert.alert('Succès', 'L\'annonce a été supprimée avec succès.');
+              Alert.alert(txt('Succès', 'Success'), txt("L'annonce a été supprimée avec succès.", 'Listing deleted successfully.'));
             } catch (error: any) {
               console.error('Error deleting listing:', error);
-              Alert.alert('Erreur', error.message || 'Une erreur est survenue lors de la suppression de l\'annonce.');
+              Alert.alert(txt('Erreur', 'Error'), error.message || txt("Une erreur est survenue lors de la suppression de l'annonce.", 'An error occurred while deleting the listing.'));
             }
           },
         },
@@ -243,17 +250,17 @@ export default function ProfileScreen() {
         <View style={styles.messageContainer}>
           <View style={styles.messageCard}>
             <Text style={styles.messageTitle}>
-              Connexion requise
+              {txt('Connexion requise', 'Login required')}
             </Text>
             <Text style={styles.messageText}>
-              Pour accéder à votre profil et gérer vos annonces, vous devez d'abord vous connecter.
+              {txt("Pour accéder à votre profil et gérer vos annonces, vous devez d'abord vous connecter.", 'To access your profile and manage your listings, please sign in first.')}
             </Text>
             
             <TouchableOpacity
               style={styles.button}
               onPress={() => router.push('/auth/login')}
             >
-              <Text style={styles.buttonText}>Se connecter</Text>
+              <Text style={styles.buttonText}>{txt('Se connecter', 'Sign in')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -329,17 +336,21 @@ export default function ProfileScreen() {
             )}
           </TouchableOpacity>
           <View style={styles.profileInfo}>
-            <Text style={styles.userName}>{user.name || 'Utilisateur'}</Text>
+            <Text style={styles.userName}>{user.name || txt('Utilisateur', 'User')}</Text>
             <View style={styles.statsRow}>
-              <View style={styles.statItem}>
+              <TouchableOpacity 
+                style={styles.statItem}
+                onPress={() => setShowRatingsExplanation(true)}
+              >
                 <Star size={14} color="#f59e0b" fill="#f59e0b" />
                 <Text style={styles.statValue}>
-                  {ratingCount > 0 ? ratingAverage.toFixed(1) : 'Nouveau'}
+                  {ratingCount > 0 ? ratingAverage.toFixed(1) : txt('Nouveau', 'New')}
                 </Text>
                 {ratingCount > 0 && (
                   <Text style={styles.statLabel}>({ratingCount})</Text>
                 )}
-              </View>
+                <HelpCircle size={12} color="#64748b" style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Package size={14} color="#64748b" />
@@ -352,31 +363,31 @@ export default function ProfileScreen() {
         <View style={styles.infoSection}>
           <View style={styles.infoItem}>
             <Phone size={18} color="#64748b" />
-            <Text style={styles.infoText}>{user.phone || 'Aucun numéro'}</Text>
+            <Text style={styles.infoText}>{user.phone || txt('Aucun numéro', 'No number')}</Text>
           </View>
           <View style={styles.infoItem}>
             <MapPin size={18} color="#64748b" />
-            <Text style={styles.infoText}>{user.location || 'Aucune ville'}</Text>
+            <Text style={styles.infoText}>{user.location || txt('Aucune ville', 'No city')}</Text>
           </View>
         </View>
 
         <View style={styles.loginCredentialsBanner}>
           <View style={styles.credentialsHeader}>
             <Text style={styles.credentialsIcon}>🔐</Text>
-            <Text style={styles.credentialsTitle}>IMPORTANT - Notez vos identifiants</Text>
+            <Text style={styles.credentialsTitle}>{txt('IMPORTANT - Notez vos identifiants', 'IMPORTANT - Save your login details')}</Text>
           </View>
           <View style={styles.credentialItem}>
-            <Text style={styles.credentialLabel}>Email de connexion:</Text>
+            <Text style={styles.credentialLabel}>{txt('Email de connexion:', 'Login email:')}</Text>
             <Text style={styles.credentialValue}>{user.email}</Text>
           </View>
           <Text style={styles.credentialsWarning}>
-            ⚠️ Écrivez ces informations quelque part pour pouvoir vous reconnecter plus tard
+            {txt('⚠️ Écrivez ces informations quelque part pour pouvoir vous reconnecter plus tard', '⚠️ Write this information down so you can sign in again later')}
           </Text>
         </View>
 
         <View style={styles.creditBanner}>
           <View style={styles.creditInfo}>
-            <Text style={styles.creditLabel}>Crédits disponibles</Text>
+            <Text style={styles.creditLabel}>{txt('Crédits disponibles', 'Available credits')}</Text>
             <Text style={styles.creditValue}>{credits || 0}</Text>
           </View>
           <TouchableOpacity 
@@ -392,13 +403,13 @@ export default function ProfileScreen() {
         {!user.profile_picture && (
           <View style={styles.promptBanner}>
             <Text style={styles.promptText}>
-              📸 Ajoutez une photo de profil pour inspirer confiance
+              {txt('📸 Ajoutez une photo de profil pour inspirer confiance', '📸 Add a profile photo to build trust')}
             </Text>
             <TouchableOpacity
               style={styles.promptButton}
               onPress={() => router.push('/edit-profile')}
             >
-              <Text style={styles.promptButtonText}>Ajouter</Text>
+              <Text style={styles.promptButtonText}>{txt('Ajouter', 'Add')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -409,7 +420,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/edit-profile')}
           >
             <Text style={styles.actionButtonText}>
-              Modifier mon profil
+              {txt('Modifier mon profil', 'Edit profile')}
             </Text>
           </TouchableOpacity>
           {(!user.phone || !user.location) && (
@@ -418,22 +429,39 @@ export default function ProfileScreen() {
               onPress={() => router.push('/auth/complete-profile')}
             >
               <Text style={styles.completeProfileButtonText}>
-                Compléter les informations
+                {txt('Compléter les informations', 'Complete profile info')}
               </Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
-            <Text style={styles.logoutButtonText}>Se déconnecter</Text>
+            <Text style={styles.logoutButtonText}>{txt('Se déconnecter', 'Sign out')}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* Profile Guidance Section */}
+      <View style={styles.guidanceSection}>
+        <ProfileGuidance 
+          onEditProfile={() => router.push('/edit-profile')}
+          userRating={ratingAverage}
+          ratingCount={ratingCount}
+        />
+      </View>
+
+      {/* Ratings Explanation Modal */}
+      <RatingsExplanation
+        visible={showRatingsExplanation}
+        onDismiss={() => setShowRatingsExplanation(false)}
+        userRating={ratingAverage}
+        ratingCount={ratingCount}
+      />
+
       <View style={styles.creditsSection}>
         <View style={styles.sectionHeaderWithIcon}>
           <View>
-            <Text style={styles.sectionTitle}>Acheter des crédits</Text>
+            <Text style={styles.sectionTitle}>{txt('Acheter des crédits', 'Buy credits')}</Text>
             <Text style={styles.sectionSubtitle}>
-              Chaque annonce coûte 1 crédit
+              {txt('Chaque annonce coûte 1 crédit', 'Each listing costs 1 credit')}
             </Text>
           </View>
         </View>
@@ -446,12 +474,12 @@ export default function ProfileScreen() {
 
       <View style={styles.listingsSection}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Mes annonces</Text>
+          <Text style={styles.sectionTitle}>{txt('Mes annonces', 'My listings')}</Text>
           <TouchableOpacity
             style={styles.newListingButton}
             onPress={() => router.push('/post')}
           >
-            <Text style={styles.newListingButtonText}>Nouvelle annonce</Text>
+            <Text style={styles.newListingButtonText}>{txt('Nouvelle annonce', 'New listing')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -460,17 +488,17 @@ export default function ProfileScreen() {
             <View style={styles.emptyStateIcon}>
               <Package size={48} color="#cbd5e1" />
             </View>
-            <Text style={styles.emptyStateTitle}>Aucune annonce</Text>
+            <Text style={styles.emptyStateTitle}>{txt('Aucune annonce', 'No listings')}</Text>
             <Text style={styles.emptyStateText}>
-              Vous n'avez pas encore publié d'annonces.{'\n'}
-              Commencez à vendre dès maintenant !
+              {txt("Vous n'avez pas encore publié d'annonces.", 'You have not posted any listings yet.')}{'\n'}
+              {txt('Commencez à vendre dès maintenant !', 'Start selling now!')}
             </Text>
             <TouchableOpacity
               style={styles.emptyStateButton}
               onPress={() => router.push('/post')}
             >
               <Text style={styles.emptyStateButtonText}>
-                Publier une annonce
+                {txt('Publier une annonce', 'Post a listing')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -763,6 +791,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#64748b',
+  },
+
+  // Guidance section
+  guidanceSection: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
 
   // Section styles

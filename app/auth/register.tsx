@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Phone, Eye, EyeOff, User, CheckSquare, Square, Mail, MapPin } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuidance } from '@/contexts/GuidanceContext';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
+import { GuidedTour } from '@/components/guidance/GuidedTour';
+import { Tooltip } from '@/components/guidance/Tooltip';
 
 export default function RegisterScreen() {
   const [firstName, setFirstName] = useState('');
@@ -34,6 +37,81 @@ export default function RegisterScreen() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { signUp } = useAuth();
   const router = useRouter();
+  
+  // Guidance state
+  const guidance = useGuidance();
+  const [showTour, setShowTour] = useState(false);
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const [phoneFocused, setPhoneFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [locationFocused, setLocationFocused] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+
+  // Initialize guidance on mount
+  useEffect(() => {
+    guidance.incrementScreenView('register');
+    
+    // Show tour if first visit
+    if (guidance.shouldShowTour('auth_registration_tour')) {
+      setShowTour(true);
+    }
+  }, []);
+
+  // Handle tour completion
+  const handleTourComplete = () => {
+    setShowTour(false);
+    guidance.markTourCompleted('auth_registration_tour');
+  };
+
+  const handleTourSkip = () => {
+    setShowTour(false);
+    guidance.markTourCompleted('auth_registration_tour');
+  };
+
+  // Show tooltips on field focus
+  const handlePhoneFocus = () => {
+    setPhoneFocused(true);
+    if (guidance.shouldShowTooltip('auth_phone_number')) {
+      setActiveTooltip('auth_phone_number');
+    }
+  };
+
+  const handlePasswordFocus = () => {
+    setPasswordFocused(true);
+    if (guidance.shouldShowTooltip('auth_password')) {
+      setActiveTooltip('auth_password');
+    }
+  };
+
+  const handleLocationFocus = () => {
+    setLocationFocused(true);
+    if (guidance.shouldShowTooltip('auth_location')) {
+      setActiveTooltip('auth_location');
+    }
+  };
+
+  const handleEmailFocus = () => {
+    setEmailFocused(true);
+    if (guidance.shouldShowTooltip('auth_email_optional')) {
+      setActiveTooltip('auth_email_optional');
+    }
+  };
+
+  const handleTooltipDismiss = (tooltipId: string) => {
+    setActiveTooltip(null);
+    guidance.markTooltipDismissed(tooltipId);
+  };
+
+  // Get tour and tooltip content
+  const tour = guidance.state.settings.language === 'fr' 
+    ? guidance.getTooltipContent('auth_registration_tour') 
+    : guidance.getTooltipContent('auth_registration_tour');
+  
+  const tourContent = showTour ? (() => {
+    const lang = guidance.state.settings.language;
+    const service = require('@/services/guidanceContent').GuidanceContentService;
+    return service.getTour('auth_registration_tour', lang);
+  })() : null;
 
   const generateEmail = async (firstName: string, lastName: string): Promise<string> => {
     // Clean and normalize names
@@ -105,6 +183,10 @@ export default function RegisterScreen() {
       const fullName = `${firstName} ${lastName}`;
 
       await signUp(finalEmail, password, fullName, phone, location);
+      
+      // Mark registration completed
+      guidance.markActionCompleted('registration_completed');
+      
       router.replace('/(tabs)');
     } catch (err: any) {
       setError(err.message || 'Erreur lors de la création du compte');
@@ -198,6 +280,8 @@ export default function RegisterScreen() {
                   placeholderTextColor="#94a3b8"
                   value={email}
                   onChangeText={setEmail}
+                  onFocus={handleEmailFocus}
+                  onBlur={() => setEmailFocused(false)}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
@@ -219,6 +303,8 @@ export default function RegisterScreen() {
                   placeholderTextColor="#94a3b8"
                   value={phone}
                   onChangeText={setPhone}
+                  onFocus={handlePhoneFocus}
+                  onBlur={() => setPhoneFocused(false)}
                   keyboardType="phone-pad"
                 />
                 <View style={styles.inputIcon}>
@@ -236,6 +322,8 @@ export default function RegisterScreen() {
                   placeholderTextColor="#94a3b8"
                   value={location}
                   onChangeText={setLocation}
+                  onFocus={handleLocationFocus}
+                  onBlur={() => setLocationFocused(false)}
                 />
                 <View style={styles.inputIcon}>
                   <MapPin size={20} color="#64748b" />
@@ -252,6 +340,8 @@ export default function RegisterScreen() {
                   placeholderTextColor="#94a3b8"
                   value={password}
                   onChangeText={setPassword}
+                  onFocus={handlePasswordFocus}
+                  onBlur={() => setPasswordFocused(false)}
                   secureTextEntry={!showPassword}
                 />
                 <TouchableOpacity 
@@ -331,6 +421,49 @@ export default function RegisterScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Guided Tour */}
+      {tourContent && (
+        <GuidedTour
+          tour={tourContent}
+          visible={showTour}
+          onComplete={handleTourComplete}
+          onSkip={handleTourSkip}
+        />
+      )}
+
+      {/* Tooltips */}
+      {activeTooltip === 'auth_phone_number' && (
+        <Tooltip
+          content={guidance.getTooltipContent('auth_phone_number')!}
+          visible={true}
+          onDismiss={() => handleTooltipDismiss('auth_phone_number')}
+        />
+      )}
+
+      {activeTooltip === 'auth_password' && (
+        <Tooltip
+          content={guidance.getTooltipContent('auth_password')!}
+          visible={true}
+          onDismiss={() => handleTooltipDismiss('auth_password')}
+        />
+      )}
+
+      {activeTooltip === 'auth_location' && (
+        <Tooltip
+          content={guidance.getTooltipContent('auth_location')!}
+          visible={true}
+          onDismiss={() => handleTooltipDismiss('auth_location')}
+        />
+      )}
+
+      {activeTooltip === 'auth_email_optional' && (
+        <Tooltip
+          content={guidance.getTooltipContent('auth_email_optional')!}
+          visible={true}
+          onDismiss={() => handleTooltipDismiss('auth_email_optional')}
+        />
+      )}
     </SafeAreaView>
   );
 }

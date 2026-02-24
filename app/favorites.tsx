@@ -12,7 +12,9 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, Package } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuidance } from '@/contexts/GuidanceContext';
 import ListingCard from '@/components/ListingCard';
+import { FavoritesGuidance } from '@/components/guidance';
 import { ListingWithDetails } from '@/types/database';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
@@ -20,12 +22,34 @@ import { TextStyles } from '@/constants/Typography';
 export default function FavoritesScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { state, shouldShowTooltip, incrementScreenView } = useGuidance();
   const [favorites, setFavorites] = useState<ListingWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showEmptyGuidance, setShowEmptyGuidance] = useState(false);
+  const [showSoldItemsGuidance, setShowSoldItemsGuidance] = useState(false);
+  const [showPriceDropGuidance, setShowPriceDropGuidance] = useState(false);
 
   useEffect(() => {
     loadFavorites();
+    incrementScreenView('favorites');
   }, []);
+
+  useEffect(() => {
+    // Show empty state guidance on first visit
+    if (favorites.length === 0 && !loading && shouldShowTooltip('favorites_empty_state')) {
+      setShowEmptyGuidance(true);
+    }
+
+    // Check for sold items
+    const soldItems = favorites.filter(item => item.status === 'sold');
+    if (soldItems.length > 0 && shouldShowTooltip('favorites_sold_items')) {
+      setShowSoldItemsGuidance(true);
+    }
+
+    // Check for price drops (this would require tracking previous prices)
+    // For now, we'll simulate this check
+    // In a real implementation, you'd compare current prices with saved prices
+  }, [favorites, loading]);
 
   const loadFavorites = async () => {
     try {
@@ -138,6 +162,27 @@ export default function FavoritesScreen() {
           />
         )}
       </View>
+
+      {/* Favorites Guidance */}
+      <FavoritesGuidance
+        visible={showEmptyGuidance}
+        isEmpty={favorites.length === 0}
+        onDismiss={() => setShowEmptyGuidance(false)}
+      />
+      
+      <FavoritesGuidance
+        visible={showSoldItemsGuidance}
+        isEmpty={false}
+        hasSoldItems={true}
+        onDismiss={() => setShowSoldItemsGuidance(false)}
+      />
+      
+      <FavoritesGuidance
+        visible={showPriceDropGuidance}
+        isEmpty={false}
+        hasPriceDrops={true}
+        onDismiss={() => setShowPriceDropGuidance(false)}
+      />
     </SafeAreaView>
   );
 }

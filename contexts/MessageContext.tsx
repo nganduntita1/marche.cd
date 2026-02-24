@@ -23,7 +23,7 @@ export function MessageProvider({ children }: { children: React.ReactNode }) {
     // Subscribe to broadcast channel for all messages
     const channel = supabase.channel(`messages-broadcast-global`);
     channel.on('broadcast', { event: 'new-message' }, (payload) => {
-      const msg = payload as Message;
+      const msg = payload?.payload as Message | undefined;
       if (!msg) return;
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,11 @@ import { useRouter } from 'expo-router';
 import { Phone, MapPin } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuidance } from '@/contexts/GuidanceContext';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
+import { GuidedTour } from '@/components/guidance/GuidedTour';
+import { Tooltip } from '@/components/guidance/Tooltip';
 
 export default function CompleteProfileScreen() {
   const [whatsapp, setWhatsapp] = useState('');
@@ -26,6 +29,61 @@ export default function CompleteProfileScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { user, loadUserProfile } = useAuth();
+  
+  // Guidance state
+  const guidance = useGuidance();
+  const [showTour, setShowTour] = useState(false);
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const [whatsappFocused, setWhatsappFocused] = useState(false);
+  const [locationFocused, setLocationFocused] = useState(false);
+
+  // Initialize guidance on mount
+  useEffect(() => {
+    guidance.incrementScreenView('complete_profile');
+    
+    // Show tour if first visit
+    if (guidance.shouldShowTour('auth_complete_profile_tour')) {
+      setShowTour(true);
+    }
+  }, []);
+
+  // Handle tour completion
+  const handleTourComplete = () => {
+    setShowTour(false);
+    guidance.markTourCompleted('auth_complete_profile_tour');
+  };
+
+  const handleTourSkip = () => {
+    setShowTour(false);
+    guidance.markTourCompleted('auth_complete_profile_tour');
+  };
+
+  // Show tooltips on field focus
+  const handleWhatsappFocus = () => {
+    setWhatsappFocused(true);
+    if (guidance.shouldShowTooltip('auth_whatsapp')) {
+      setActiveTooltip('auth_whatsapp');
+    }
+  };
+
+  const handleLocationFocus = () => {
+    setLocationFocused(true);
+    if (guidance.shouldShowTooltip('auth_location')) {
+      setActiveTooltip('auth_location');
+    }
+  };
+
+  const handleTooltipDismiss = (tooltipId: string) => {
+    setActiveTooltip(null);
+    guidance.markTooltipDismissed(tooltipId);
+  };
+
+  // Get tour content
+  const tourContent = showTour ? (() => {
+    const lang = guidance.state.settings.language;
+    const service = require('@/services/guidanceContent').GuidanceContentService;
+    return service.getTour('auth_complete_profile_tour', lang);
+  })() : null;
 
   const handleComplete = async () => {
     if (!whatsapp || !location) {
@@ -54,6 +112,9 @@ export default function CompleteProfileScreen() {
 
       // Reload user profile to get updated data
       await loadUserProfile(user.id);
+      
+      // Mark profile completion
+      guidance.markActionCompleted('profile_completed');
       
       // Navigate to home page
       router.replace('/(tabs)');
@@ -111,6 +172,8 @@ export default function CompleteProfileScreen() {
                   placeholderTextColor="#94a3b8"
                   value={whatsapp}
                   onChangeText={setWhatsapp}
+                  onFocus={handleWhatsappFocus}
+                  onBlur={() => setWhatsappFocused(false)}
                   keyboardType="phone-pad"
                 />
                 <View style={styles.inputIcon}>
@@ -128,6 +191,8 @@ export default function CompleteProfileScreen() {
                   placeholderTextColor="#94a3b8"
                   value={location}
                   onChangeText={setLocation}
+                  onFocus={handleLocationFocus}
+                  onBlur={() => setLocationFocused(false)}
                 />
                 <View style={styles.inputIcon}>
                   <MapPin size={20} color="#64748b" />
@@ -154,6 +219,33 @@ export default function CompleteProfileScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Guided Tour */}
+      {tourContent && (
+        <GuidedTour
+          tour={tourContent}
+          visible={showTour}
+          onComplete={handleTourComplete}
+          onSkip={handleTourSkip}
+        />
+      )}
+
+      {/* Tooltips */}
+      {activeTooltip === 'auth_whatsapp' && (
+        <Tooltip
+          content={guidance.getTooltipContent('auth_whatsapp')!}
+          visible={true}
+          onDismiss={() => handleTooltipDismiss('auth_whatsapp')}
+        />
+      )}
+
+      {activeTooltip === 'auth_location' && (
+        <Tooltip
+          content={guidance.getTooltipContent('auth_location')!}
+          visible={true}
+          onDismiss={() => handleTooltipDismiss('auth_location')}
+        />
+      )}
     </SafeAreaView>
   );
 }

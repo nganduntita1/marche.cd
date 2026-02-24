@@ -11,7 +11,6 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import Colors from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
@@ -39,7 +38,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { useTranslation } from 'react-i18next';
 import i18n from '../lib/i18n';
-import { TextStyles } from '@/constants/Typography';
+
+const LANGUAGE_MODE_STORAGE_KEY = 'app_language_mode';
+const LANGUAGE_MODE_MANUAL = 'manual';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -65,9 +66,17 @@ export default function SettingsScreen() {
   const loadSettings = async () => {
     try {
       const savedLanguage = await AsyncStorage.getItem('app_language');
+      const languageMode = await AsyncStorage.getItem(LANGUAGE_MODE_STORAGE_KEY);
       const savedDarkMode = await AsyncStorage.getItem('dark_mode');
       
-      if (savedLanguage) setLanguage(savedLanguage as 'fr' | 'en');
+      if (savedLanguage && languageMode === LANGUAGE_MODE_MANUAL) {
+        setLanguage(savedLanguage as 'fr' | 'en');
+      } else {
+        const detected = (i18n.language || 'fr').split('-')[0];
+        if (detected === 'en' || detected === 'fr') {
+          setLanguage(detected);
+        }
+      }
       if (savedDarkMode) setDarkMode(savedDarkMode === 'true');
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -77,6 +86,7 @@ export default function SettingsScreen() {
   const handleLanguageChange = async (newLanguage: 'fr' | 'en') => {
     try {
       await AsyncStorage.setItem('app_language', newLanguage);
+      await AsyncStorage.setItem(LANGUAGE_MODE_STORAGE_KEY, LANGUAGE_MODE_MANUAL);
       setLanguage(newLanguage);
       i18n.changeLanguage(newLanguage);
       setShowLanguageModal(false);
@@ -90,25 +100,25 @@ export default function SettingsScreen() {
     try {
       await AsyncStorage.setItem('dark_mode', value.toString());
       setDarkMode(value);
-      Alert.alert('Info', 'Le mode sombre sera disponible dans une prochaine mise à jour');
+      Alert.alert(t('info'), t('settings_dark_mode_coming_soon'));
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de changer le mode');
+      Alert.alert(t('error'), t('settings_change_mode_failed'));
     }
   };
 
   const handlePasswordChange = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      Alert.alert(t('error'), t('settings_fill_all_fields'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+      Alert.alert(t('error'), t('settings_passwords_not_match'));
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
+      Alert.alert(t('error'), t('settings_password_min_length'));
       return;
     }
 
@@ -119,24 +129,24 @@ export default function SettingsScreen() {
 
       if (error) throw error;
 
-      Alert.alert('Succès', 'Mot de passe mis à jour avec succès');
+      Alert.alert(t('success'), t('settings_password_updated_success'));
       setShowPasswordModal(false);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Impossible de changer le mot de passe');
+      Alert.alert(t('error'), error.message || t('settings_change_password_failed'));
     }
   };
 
   const handleSignOut = () => {
     Alert.alert(
-      'Se déconnecter',
-      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      t('settings_sign_out_title'),
+      t('settings_sign_out_confirm'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Déconnecter',
+          text: t('sign_out'),
           style: 'destructive',
           onPress: async () => {
             await signOut();
@@ -149,16 +159,16 @@ export default function SettingsScreen() {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Supprimer le compte',
-      'Cette action est irréversible. Toutes vos données seront supprimées définitivement.',
+      t('delete_account'),
+      t('settings_delete_account_confirm'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: t('delete_account'),
           style: 'destructive',
           onPress: () => {
             // TODO: Implement account deletion
-            Alert.alert('Info', 'Contactez le support pour supprimer votre compte.');
+            Alert.alert(t('info'), t('settings_contact_support_delete'));
           },
         },
       ]
@@ -172,11 +182,11 @@ export default function SettingsScreen() {
 
   const handleRateApp = () => {
     // TODO: Add actual app store links
-    Alert.alert('Merci!', 'Nous apprécions votre soutien. Notez-nous sur l\'App Store ou Google Play.');
+    Alert.alert(t('settings_thanks_title'), t('settings_rate_app_message'));
   };
 
   const handleShareApp = () => {
-    Alert.alert('Partager', 'Partagez Marché.cd avec vos amis!');
+    Alert.alert(t('share_app'), t('settings_share_message'));
   };
 
   const SettingSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -209,7 +219,7 @@ export default function SettingsScreen() {
     >
       <View style={styles.settingItemLeft}>
         <View style={styles.iconContainer}>
-          <Icon size={20} color={Colors.primary} strokeWidth={2} />
+          <Icon size={20} color="#9bbd1f" strokeWidth={2} />
         </View>
         <View style={styles.settingItemText}>
           <Text style={styles.settingItemTitle}>{title}</Text>
@@ -242,7 +252,7 @@ export default function SettingsScreen() {
         <Switch
           value={value}
           onValueChange={onValueChange}
-          trackColor={{ false: '#e2e8f0', true: Colors.primary }}
+          trackColor={{ false: '#e2e8f0', true: '#9bbd1f' }}
           thumbColor="#fff"
         />
       }
@@ -669,11 +679,11 @@ const styles = StyleSheet.create({
   },
   languageTextSelected: {
     fontWeight: '600',
-    color: Colors.primary,
+    color: '#9bbd1f',
   },
   checkmark: {
     fontSize: 20,
-    color: Colors.primary,
+    color: '#9bbd1f',
     fontWeight: '700',
   },
   passwordForm: {
@@ -697,7 +707,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   changePasswordButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#9bbd1f',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

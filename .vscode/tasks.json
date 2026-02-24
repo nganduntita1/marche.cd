@@ -1,0 +1,27 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Expo Dev Server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "expo: hard restart",
+			"type": "shell",
+			"command": "npx expo start -c",
+			"isBackground": true
+		},
+		{
+			"label": "expo: hard restart web",
+			"type": "shell",
+			"command": "npx expo start -c --web",
+			"isBackground": true
+		}
+	]
+}

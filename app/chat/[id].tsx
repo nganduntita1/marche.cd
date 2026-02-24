@@ -10,29 +10,36 @@ View,
   Platform,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Send, X } from 'lucide-react-native';
+import { ArrowLeft, Send, X, Flag, UserX } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/contexts/MessagesContext';
 import { Message, Conversation } from '@/types/chat';
 import Colors from '@/constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MessagingGuidance } from '@/components/guidance';
+import { useTranslation } from 'react-i18next';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
   const { refreshUnreadCount } = useMessages();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
   const [showSafetyBanner, setShowSafetyBanner] = useState(true);
+  const [inputFocused, setInputFocused] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   // track optimistic messages to reconcile with server responses
   const optimisticRef = useRef<Record<string, boolean>>({});
@@ -105,6 +112,143 @@ export default function ChatScreen() {
     }
   };
 
+  const getScamKeywordMatches = (message: string): string[] => {
+    const patterns = [
+      { label: 'OTP/code', regex: /\b(otp|code\s+de\s+verification|verification\s+code)\b/i },
+      { label: t('chat_risk_advance_payment'), regex: /\b(acompte|avance|payer\s+avant|paie\s+avant)\b/i },
+      { label: t('chat_risk_money_transfer'), regex: /\b(envoyer\s+argent|transfert|western\s+union|moneygram)\b/i },
+      { label: t('chat_risk_gift_crypto'), regex: /\b(gift\s*card|carte\s*cadeau|crypto|bitcoin|usdt)\b/i },
+      { label: t('chat_risk_external_contact'), regex: /\b(telegram|signal|whatsapp\s+business)\b/i },
+    ];
+
+    return patterns
+      .filter((pattern) => pattern.regex.test(message))
+      .map((pattern) => pattern.label);
+  };
+
+  const confirmSuspiciousMessageSend = (matches: string[]): Promise<boolean> => {
+    return new Promise((resolve) => {
+      Alert.alert(
+        t('chat_alert_risky_title'),
+        t('chat_alert_risky_message', { matches: matches.join(', ') }),
+        [
+          { text: t('cancel'), style: 'cancel', onPress: () => resolve(false) },
+          { text: t('chat_send_anyway'), onPress: () => resolve(true) },
+        ],
+        {
+          cancelable: true,
+          onDismiss: () => resolve(false),
+        }
+      );
+    });
+  };
+
+  const checkConversationBlockStatus = async (conversationData: Conversation | any) => {
+    if (!user || !conversationData) return;
+
+    const otherParticipantId =
+      user.id === conversationData.buyer_id
+        ? conversationData.seller_id
+        : conversationData.buyer_id;
+
+    if (!otherParticipantId) {
+      setIsBlocked(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('blocked_users')
+      .select('id')
+      .eq('is_active', true)
+      .or(`and(user_id.eq.${user.id},blocked_user_id.eq.${otherParticipantId}),and(user_id.eq.${otherParticipantId},blocked_user_id.eq.${user.id})`)
+      .limit(1);
+
+    if (error) {
+      console.error('[CHAT] Error checking block status:', error);
+      return;
+    }
+
+    setIsBlocked((data?.length || 0) > 0);
+  };
+
+  const submitReport = async (reason: 'scam' | 'spam' | 'harassment' | 'other') => {
+    if (!conversation || !user) return;
+
+    const otherParticipantId =
+      user.id === conversation.buyer_id ? conversation.seller_id : conversation.buyer_id;
+
+    if (!otherParticipantId) return;
+
+    setActionLoading(true);
+    try {
+      const { error } = await supabase.rpc('report_user', {
+        target_user_id: otherParticipantId,
+        report_reason: reason,
+        report_details: t('chat_report_details', { id }),
+        report_conversation_id: id as string,
+      });
+
+      if (error) throw error;
+
+      Alert.alert(t('chat_thanks'), t('chat_report_success'));
+    } catch (error: any) {
+      console.error('[CHAT] Error reporting user:', error);
+      Alert.alert(t('error'), error?.message || t('chat_report_failed'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const showReportOptions = () => {
+    Alert.alert(t('chat_report_user_title'), t('chat_report_user_subtitle'), [
+      { text: t('chat_report_reason_scam'), onPress: () => submitReport('scam') },
+      { text: t('chat_report_reason_spam'), onPress: () => submitReport('spam') },
+      { text: t('chat_report_reason_harassment'), onPress: () => submitReport('harassment') },
+      { text: t('chat_report_reason_other'), onPress: () => submitReport('other') },
+      { text: t('cancel'), style: 'cancel' },
+    ]);
+  };
+
+  const blockOtherUser = async () => {
+    if (!conversation || !user) return;
+
+    const otherParticipantId =
+      user.id === conversation.buyer_id ? conversation.seller_id : conversation.buyer_id;
+
+    if (!otherParticipantId) return;
+
+    Alert.alert(
+      t('chat_block_title'),
+      t('chat_block_message'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('chat_block_confirm'),
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              const { error } = await supabase.rpc('block_user', {
+                target_user_id: otherParticipantId,
+                block_reason: 'Blocked from chat screen',
+              });
+
+              if (error) throw error;
+
+              setIsBlocked(true);
+              Alert.alert(t('chat_blocked_title'), t('chat_blocked_message'));
+            } catch (error: any) {
+              console.error('[CHAT] Error blocking user:', error);
+              Alert.alert(t('error'), error?.message || t('chat_block_failed'));
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const loadConversation = async () => {
     try {
       const { data, error } = await supabase
@@ -120,6 +264,7 @@ export default function ChatScreen() {
 
       if (error) throw error;
       setConversation(data);
+      await checkConversationBlockStatus(data);
     } catch (error) {
       console.error('Error loading conversation:', error);
     }
@@ -207,7 +352,7 @@ export default function ChatScreen() {
             .from('messages')
             .update({ is_read: true })
             .eq('id', newMsg.id)
-            .then(({ error }) => {
+            .then(({ error }: { error: any }) => {
               if (!error) {
                 console.log('[CHAT] New message marked as read');
                 refreshUnreadCount();
@@ -251,7 +396,7 @@ export default function ChatScreen() {
             .from('messages')
             .update({ is_read: true })
             .eq('id', newMsg.id)
-            .then(({ error }) => {
+            .then(({ error }: { error: any }) => {
               if (!error) {
                 console.log('[CHAT] Broadcast message marked as read');
                 refreshUnreadCount();
@@ -329,7 +474,7 @@ export default function ChatScreen() {
 
         // Add any new messages we don't already have
         setMessages((prev) => {
-          const newMsgs = data.filter((m) => !prev.some((existing) => existing.id === m.id));
+          const newMsgs = data.filter((m: Message) => !prev.some((existing) => existing.id === m.id));
           if (newMsgs.length === 0) return prev;
           console.log('[CHAT] Polling added', newMsgs.length, 'new messages');
           return [...prev, ...newMsgs];
@@ -354,17 +499,32 @@ export default function ChatScreen() {
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !user || sending) return;
+    const trimmedMessage = newMessage.trim();
+    if (!trimmedMessage || !user || sending) return;
+
+    if (isBlocked) {
+      Alert.alert(t('chat_conversation_blocked'), t('chat_send_disabled_blocked'));
+      return;
+    }
 
     setSending(true);
     try {
+      const scamMatches = getScamKeywordMatches(trimmedMessage);
+      if (scamMatches.length > 0) {
+        const proceed = await confirmSuspiciousMessageSend(scamMatches);
+        if (!proceed) {
+          setSending(false);
+          return;
+        }
+      }
+
       // optimistic: create a temporary local message id
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       const optimisticMessage: Message = {
         id: tempId,
         conversation_id: id as string,
         sender_id: user.id,
-        content: newMessage.trim(),
+        content: trimmedMessage,
         is_read: false,
         created_at: new Date().toISOString(),
       };
@@ -418,8 +578,19 @@ export default function ChatScreen() {
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
+
+      const errorMessage = error?.message || '';
+      if (errorMessage.includes('RATE_LIMIT_EXCEEDED')) {
+        Alert.alert(t('chat_too_many_messages_title'), t('chat_too_many_messages_message'));
+      } else if (errorMessage.includes('BLOCKED_USER')) {
+        setIsBlocked(true);
+        Alert.alert(t('chat_conversation_blocked'), t('chat_send_failed_blocked'));
+      } else {
+        Alert.alert(t('error'), t('chat_send_failed_generic'));
+      }
+
       // on error: remove optimistic message(s)
       setMessages((prev) => prev.filter((m) => !m.id.startsWith('temp-')));
     } finally {
@@ -441,9 +612,9 @@ export default function ChatScreen() {
     yesterday.setDate(yesterday.getDate() - 1);
 
     if (msgDate.toDateString() === today.toDateString()) {
-      return 'Aujourd\'hui';
+      return t('chat_today');
     } else if (msgDate.toDateString() === yesterday.toDateString()) {
-      return 'Hier';
+      return t('chat_yesterday');
     } else {
       return msgDate.toLocaleDateString('fr-FR', {
         day: 'numeric',
@@ -582,7 +753,32 @@ export default function ChatScreen() {
             )}
           </View>
         </TouchableOpacity>
+
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerActionButton}
+            onPress={showReportOptions}
+            disabled={actionLoading}
+          >
+            <Flag size={18} color="#92400e" strokeWidth={2.2} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerActionButton, styles.headerActionDanger]}
+            onPress={blockOtherUser}
+            disabled={actionLoading || isBlocked}
+          >
+            <UserX size={18} color="#b91c1c" strokeWidth={2.2} />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {isBlocked && (
+        <View style={styles.blockedBanner}>
+          <Text style={styles.blockedBannerText}>
+            {t('chat_blocked_banner')}
+          </Text>
+        </View>
+      )}
 
       {/* Listing Preview Card */}
       {conversation?.listing && (
@@ -658,24 +854,36 @@ export default function ChatScreen() {
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
-              placeholder="Écrire un message"
+              placeholder={isBlocked ? t('chat_conversation_blocked') : t('chat_write_message')}
               placeholderTextColor="#8e8e93"
               value={newMessage}
               onChangeText={setNewMessage}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
               multiline
               maxLength={1000}
+              editable={!isBlocked}
             />
           </View>
           
           <TouchableOpacity
             style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
             onPress={sendMessage}
-            disabled={!newMessage.trim() || sending}
+            disabled={!newMessage.trim() || sending || isBlocked}
           >
             <Send size={20} color="#fff" fill="#fff" strokeWidth={2} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Messaging Guidance */}
+      <MessagingGuidance
+        conversationId={id as string}
+        messageCount={messages.length}
+        lastMessageTime={messages.length > 0 ? messages[messages.length - 1].created_at : undefined}
+        onTemplateSelect={(template) => setNewMessage(template)}
+        showTemplatePickerTrigger={inputFocused}
+      />
       </View>
     </SafeAreaView>
   );
@@ -713,6 +921,22 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerActionButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#fef3c7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActionDanger: {
+    backgroundColor: '#fee2e2',
   },
   headerAvatar: {
     width: 40,
@@ -791,6 +1015,19 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#c7c7cc',
     fontWeight: '300',
+  },
+  blockedBanner: {
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fecaca',
+  },
+  blockedBannerText: {
+    color: '#991b1b',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   safetyBanner: {
     flexDirection: 'row',

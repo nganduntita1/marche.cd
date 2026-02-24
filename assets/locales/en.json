@@ -51,17 +51,57 @@
   "new_password": "New Password",
   "minimum_6_characters": "Minimum 6 characters",
   "confirm_password": "Confirm Password",
-  "retype_password": "Retype your password",
-  "home": {
-    "location": "Location",
-    "currentLocation": "Current Location",
-    "within": "Within",
-    "allListings": "All listings",
-    "searchRadius": "Search Radius"
-  },
-  "listing": {
-    "location": "Location",
-    "awayFromYou": "from you",
-    "approximateArea": "Approximate area for your safety"
-  }
+  "retype_password": "Retype your password"
+  ,"cancel": "Cancel"
+  ,"tab_home": "Home"
+  ,"tab_messages": "Messages"
+  ,"tab_profile": "Profile"
+  ,"tab_post": "Post"
+  ,"chat_risk_advance_payment": "Advance payment"
+  ,"chat_risk_money_transfer": "Money transfer"
+  ,"chat_risk_gift_crypto": "Gift card/Crypto"
+  ,"chat_risk_external_contact": "Risky external contact"
+  ,"chat_alert_risky_title": "⚠️ Potentially risky message"
+  ,"chat_alert_risky_message": "We detected: {{matches}}.\n\nNever share OTP codes, passwords, or advance payments."
+  ,"chat_send_anyway": "Send anyway"
+  ,"chat_report_details": "Reported from conversation {{id}}"
+  ,"chat_thanks": "Thanks"
+  ,"chat_report_success": "Your report has been sent to our team."
+  ,"chat_report_failed": "Unable to send report."
+  ,"chat_report_user_title": "Report this user"
+  ,"chat_report_user_subtitle": "Choose the main reason for this report"
+  ,"chat_report_reason_scam": "Scam attempt"
+  ,"chat_report_reason_spam": "Spam"
+  ,"chat_report_reason_harassment": "Harassment"
+  ,"chat_report_reason_other": "Other"
+  ,"chat_block_title": "Block this user"
+  ,"chat_block_message": "You won't be able to send or receive messages in this conversation."
+  ,"chat_block_confirm": "Block"
+  ,"chat_blocked_title": "User blocked"
+  ,"chat_blocked_message": "Blocking is now active for this conversation."
+  ,"chat_block_failed": "Unable to block this user."
+  ,"chat_conversation_blocked": "Blocked conversation"
+  ,"chat_send_disabled_blocked": "Sending is disabled because one user is blocked."
+  ,"chat_too_many_messages_title": "Too many messages"
+  ,"chat_too_many_messages_message": "You're sending too fast. Please wait a few seconds and try again."
+  ,"chat_send_failed_blocked": "Cannot send because a block is active."
+  ,"chat_send_failed_generic": "Unable to send the message. Please try again."
+  ,"chat_today": "Today"
+  ,"chat_yesterday": "Yesterday"
+  ,"chat_blocked_banner": "This conversation is blocked. Sending new messages is disabled."
+  ,"chat_write_message": "Write a message"
+  ,"settings_dark_mode_coming_soon": "Dark mode will be available in a future update"
+  ,"settings_change_mode_failed": "Unable to change mode"
+  ,"settings_fill_all_fields": "Please fill in all fields"
+  ,"settings_passwords_not_match": "Passwords do not match"
+  ,"settings_password_min_length": "Password must be at least 6 characters"
+  ,"settings_password_updated_success": "Password updated successfully"
+  ,"settings_change_password_failed": "Unable to change password"
+  ,"settings_sign_out_title": "Sign out"
+  ,"settings_sign_out_confirm": "Are you sure you want to sign out?"
+  ,"settings_delete_account_confirm": "This action is irreversible. All your data will be permanently deleted."
+  ,"settings_contact_support_delete": "Contact support to delete your account."
+  ,"settings_thanks_title": "Thanks!"
+  ,"settings_rate_app_message": "We appreciate your support. Rate us on the App Store or Google Play."
+  ,"settings_share_message": "Share Marché.cd with your friends!"
 }

@@ -15,31 +15,37 @@ View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, MapPin, MessageCircle, Calendar, Tag, ChevronLeft, ChevronRight, X, Heart, Star, ThumbsUp, DollarSign, Share2, Sparkles } from 'lucide-react-native';
+import { ArrowLeft, MapPin, MessageCircle, Calendar, ChevronLeft, ChevronRight, X, Heart, Star, ThumbsUp, DollarSign, Share2, Sparkles } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ListingWithDetails } from '@/types/database';
 
 const { width } = Dimensions.get('window');
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from '@/contexts/LocationContext';
+import { useGuidance } from '@/contexts/GuidanceContext';
 import { calculateDistance, formatDistance } from '@/services/locationService';
 import Colors from '@/constants/Colors';
-import { TextStyles } from '@/constants/Typography';
 import SafetyTipsModal from '@/components/SafetyTipsModal';
 import ShareModal from '@/components/ShareModal';
 import PromoteModal from '@/components/PromoteModal';
 import SelectBuyerModal from '@/components/SelectBuyerModal';
+import { Tooltip } from '@/components/guidance/Tooltip';
+import { ContextualPrompt } from '@/components/guidance/ContextualPrompt';
 import { Platform } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { i18n } = useTranslation();
   const { userLocation } = useLocation();
+  const guidance = useGuidance();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const [listing, setListing] = useState<ListingWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageIndex, setModalImageIndex] = useState(0);
   const [showSafetyGuide, setShowSafetyGuide] = useState(false);
@@ -55,11 +61,59 @@ export default function ListingDetailScreen() {
   const [showSelectBuyerModal, setShowSelectBuyerModal] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<string>('');
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Guidance state
+  const [showContactTooltip, setShowContactTooltip] = useState(false);
+  const [showImageSwipeHint, setShowImageSwipeHint] = useState(false);
+  const [showQuickActionsPrompt, setShowQuickActionsPrompt] = useState(false);
+  const [showFavoriteConfirmation, setShowFavoriteConfirmation] = useState(false);
+  const [showSellerProfileTooltip, setShowSellerProfileTooltip] = useState(false);
+  const [idleTimer, setIdleTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const messageButtonRef = useRef<View>(null);
+  const favoriteButtonRef = useRef<View>(null);
+  const sellerCardRef = useRef<View>(null);
 
   useEffect(() => {
     if (id) {
       loadListing();
       checkFavoriteStatus();
+      
+      // Track screen view for guidance
+      guidance.incrementScreenView('listing_detail');
+      
+      // Show guidance on first visit
+      const isFirstVisit = !guidance.state.features.hasViewedFirstListing;
+      if (isFirstVisit) {
+        // Mark as viewed
+        guidance.markActionCompleted('first_listing_view');
+        
+        // Show contact seller tooltip after a short delay
+        setTimeout(() => {
+          if (guidance.shouldShowTooltip('listing_contact_seller')) {
+            setShowContactTooltip(true);
+          }
+        }, 1000);
+        
+        // Show image swipe hint if multiple images
+        setTimeout(() => {
+          if (guidance.shouldShowTooltip('listing_image_swipe')) {
+            setShowImageSwipeHint(true);
+          }
+        }, 3000);
+      }
+      
+      // Set up idle timer for Quick Actions (5 seconds of inactivity)
+      const timer = setTimeout(() => {
+        if (guidance.shouldShowPrompt('listing_quick_actions')) {
+          setShowQuickActionsPrompt(true);
+        }
+      }, 5000);
+      
+      setIdleTimer(timer);
+      
+      return () => {
+        if (timer) clearTimeout(timer);
+      };
     }
   }, [id]);
 
@@ -113,6 +167,11 @@ export default function ListingDetailScreen() {
 
         if (!error) {
           setIsFavorite(true);
+          
+          // Show confirmation on first favorite
+          if (guidance.shouldShowTooltip('listing_favorite_confirmation')) {
+            setShowFavoriteConfirmation(true);
+          }
         }
       }
     } catch (error) {
@@ -163,7 +222,7 @@ export default function ListingDetailScreen() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat('fr-FR', {
+    return new Intl.DateTimeFormat(isFrench ? 'fr-FR' : 'en-US', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
@@ -175,7 +234,10 @@ export default function ListingDetailScreen() {
 
     const phone = listing.seller.phone.replace(/\D/g, '');
     const message = encodeURIComponent(
-      `Bonjour! Je suis intéressé par votre annonce "${listing.title}" sur Marché.cd`
+      txt(
+        `Bonjour! Je suis intéressé par votre annonce "${listing.title}" sur Marché.cd`,
+        `Hi! I'm interested in your listing "${listing.title}" on Marché.cd`
+      )
     );
     const url = `https://wa.me/${phone}?text=${message}`;
 
@@ -217,11 +279,11 @@ export default function ListingDetailScreen() {
 
   const getConditionLabel = (condition: string) => {
     const labels: Record<string, string> = {
-      new: 'Neuf',
-      like_new: 'Comme neuf',
-      good: 'Bon état',
-      fair: 'État correct',
-      poor: 'À réparer',
+      new: txt('Neuf', 'New'),
+      like_new: txt('Comme neuf', 'Like new'),
+      good: txt('Bon état', 'Good'),
+      fair: txt('État correct', 'Fair'),
+      poor: txt('À réparer', 'Needs repair'),
     };
     return labels[condition] || condition;
   };
@@ -291,12 +353,15 @@ export default function ListingDetailScreen() {
       router.push(`/chat/${newConv.id}`);
     } catch (error) {
       console.error('Error creating conversation:', error);
-      Alert.alert('Erreur', 'Impossible de créer la conversation');
+      Alert.alert(txt('Erreur', 'Error'), txt('Impossible de créer la conversation', 'Unable to create the conversation'));
     }
   };
 
   const handleIsAvailable = () => {
-    const message = `Bonjour! Est-ce que "${listing?.title}" est toujours disponible?`;
+    const message = txt(
+      `Bonjour! Est-ce que "${listing?.title}" est toujours disponible?`,
+      `Hi! Is "${listing?.title}" still available?`
+    );
     handleQuickMessage(message);
   };
 
@@ -306,17 +371,20 @@ export default function ListingDetailScreen() {
 
   const submitOffer = () => {
     if (!offerAmount.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer un montant');
+      Alert.alert(txt('Erreur', 'Error'), txt('Veuillez entrer un montant', 'Please enter an amount'));
       return;
     }
 
     const amount = parseFloat(offerAmount.replace(/[^0-9.]/g, ''));
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Erreur', 'Montant invalide');
+      Alert.alert(txt('Erreur', 'Error'), txt('Montant invalide', 'Invalid amount'));
       return;
     }
 
-    const message = `Bonjour! Je suis intéressé par "${listing?.title}". Seriez-vous d'accord pour ${formatPrice(amount)}?`;
+    const message = txt(
+      `Bonjour! Je suis intéressé par "${listing?.title}". Seriez-vous d'accord pour ${formatPrice(amount)}?`,
+      `Hi! I'm interested in "${listing?.title}". Would you accept ${formatPrice(amount)}?`
+    );
     setShowOfferModal(false);
     setOfferAmount('');
     handleQuickMessage(message);
@@ -328,7 +396,7 @@ export default function ListingDetailScreen() {
 
   const submitCustomMessage = () => {
     if (!customMessage.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer un message');
+      Alert.alert(txt('Erreur', 'Error'), txt('Veuillez entrer un message', 'Please enter a message'));
       return;
     }
 
@@ -343,7 +411,7 @@ export default function ListingDetailScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Chargement...</Text>
+          <Text style={styles.loadingText}>{txt('Chargement...', 'Loading...')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -353,13 +421,13 @@ export default function ListingDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Annonce introuvable</Text>
-          <Text style={styles.errorText}>Cette annonce n'existe plus ou a été supprimée.</Text>
+          <Text style={styles.errorTitle}>{txt('Annonce introuvable', 'Listing not found')}</Text>
+          <Text style={styles.errorText}>{txt("Cette annonce n'existe plus ou a été supprimée.", 'This listing no longer exists or was deleted.')}</Text>
           <TouchableOpacity
             style={styles.errorBackButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.errorBackButtonText}>Retour</Text>
+            <Text style={styles.errorBackButtonText}>{txt('Retour', 'Back')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -446,9 +514,9 @@ export default function ListingDetailScreen() {
           {/* Breadcrumb */}
           {listing.category && (
             <View style={styles.breadcrumb}>
-              <Text style={styles.breadcrumbText}>Électronique</Text>
+              <Text style={styles.breadcrumbText}>{txt('Électronique', 'Electronics')}</Text>
               <Text style={styles.breadcrumbSeparator}>/</Text>
-              <Text style={styles.breadcrumbText}>Audio et Vidéo</Text>
+              <Text style={styles.breadcrumbText}>{txt('Audio et Vidéo', 'Audio & Video')}</Text>
               <Text style={styles.breadcrumbSeparator}>/</Text>
               <Text style={[styles.breadcrumbText, styles.breadcrumbActive]}>
                 {listing.category.name}
@@ -465,12 +533,13 @@ export default function ListingDetailScreen() {
                   style={styles.headerMarkSoldButton}
                   onPress={() => setShowSelectBuyerModal(true)}
                 >
-                  <Text style={styles.headerMarkSoldButtonText}>Marquer vendu</Text>
+                  <Text style={styles.headerMarkSoldButtonText}>{txt('Marquer vendu', 'Mark sold')}</Text>
                 </TouchableOpacity>
               )
             ) : (
               // Buyer: Show favorite button
               <TouchableOpacity
+                ref={favoriteButtonRef}
                 style={styles.headerFavoriteButton}
                 onPress={toggleFavorite}
                 disabled={favoriteLoading}
@@ -490,35 +559,35 @@ export default function ListingDetailScreen() {
             <View style={styles.ratingItem}>
               <Star size={18} color="#f59e0b" fill="#f59e0b" />
               <Text style={styles.ratingText}>4.6</Text>
-              <Text style={styles.reviewsText}>120 Avis</Text>
+              <Text style={styles.reviewsText}>{txt('120 Avis', '120 Reviews')}</Text>
             </View>
             <View style={styles.ratingItem}>
               <ThumbsUp size={18} color={Colors.primary} />
               <Text style={styles.recommendText}>86%</Text>
-              <Text style={styles.recommendSubtext}>(102) recommandent</Text>
+              <Text style={styles.recommendSubtext}>{txt('(102) recommandent', '(102) recommend')}</Text>
             </View>
           </View>
 
           <View style={styles.separator} />
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.sectionTitle}>{txt('Description', 'Description')}</Text>
             <Text style={styles.description}>{listing.description}</Text>
           </View>
 
           <View style={styles.separator} />
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Détails</Text>
+            <Text style={styles.sectionTitle}>{txt('Détails', 'Details')}</Text>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>État</Text>
+              <Text style={styles.detailLabel}>{txt('État', 'Condition')}</Text>
               <Text style={styles.detailValue}>
                 {getConditionLabel(listing.condition)}
               </Text>
             </View>
             <View style={styles.detailRow}>
               <Calendar size={16} color="#64748b" />
-              <Text style={styles.detailLabel}>Publié le</Text>
+              <Text style={styles.detailLabel}>{txt('Publié le', 'Posted on')}</Text>
               <Text style={styles.detailValue}>
                 {formatDate(listing.created_at)}
               </Text>
@@ -529,7 +598,7 @@ export default function ListingDetailScreen() {
 
           {/* Location Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Localisation</Text>
+            <Text style={styles.sectionTitle}>{txt('Localisation', 'Location')}</Text>
             
             <View style={styles.locationInfo}>
               <View style={styles.locationRow}>
@@ -538,12 +607,12 @@ export default function ListingDetailScreen() {
                   <Text style={styles.locationCity}>{listing.location}</Text>
                   {userLocation && listing.latitude && listing.longitude && (
                     <Text style={styles.locationDistance}>
-                      À {formatDistance(calculateDistance(
+                      {txt('À', '')} {formatDistance(calculateDistance(
                         userLocation.latitude,
                         userLocation.longitude,
                         listing.latitude,
                         listing.longitude
-                      ))} de vous
+                      ))} {txt('de vous', 'away from you')}
                     </Text>
                   )}
                 </View>
@@ -580,7 +649,7 @@ export default function ListingDetailScreen() {
                 
                 <View style={styles.mapOverlay}>
                   <Text style={styles.mapOverlayText}>
-                    📍 Zone approximative pour votre sécurité
+                    {txt('📍 Zone approximative pour votre sécurité', '📍 Approximate area for your safety')}
                   </Text>
                 </View>
               </View>
@@ -590,11 +659,17 @@ export default function ListingDetailScreen() {
           <View style={styles.separator} />
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Vendeur</Text>
-            <View style={styles.sellerCard}>
+            <Text style={styles.sectionTitle}>{txt('Vendeur', 'Seller')}</Text>
+            <View ref={sellerCardRef} style={styles.sellerCard}>
               <TouchableOpacity 
                 style={styles.sellerInfo}
-                onPress={() => router.push(`/user/${listing.seller_id}`)}
+                onPress={() => {
+                  router.push(`/user/${listing.seller_id}`);
+                  // Show seller profile tooltip on first view
+                  if (guidance.shouldShowTooltip('listing_seller_profile')) {
+                    setShowSellerProfileTooltip(true);
+                  }
+                }}
                 activeOpacity={0.7}
               >
                 {listing.seller.profile_picture ? (
@@ -632,7 +707,7 @@ export default function ListingDetailScreen() {
                     </View>
                     <View style={styles.sellerStatDivider} />
                     <View style={styles.sellerStat}>
-                      <Text style={styles.sellerStatLabel}>24 ventes</Text>
+                      <Text style={styles.sellerStatLabel}>{txt('24 ventes', '24 sales')}</Text>
                     </View>
                   </View>
                 </View>
@@ -641,7 +716,7 @@ export default function ListingDetailScreen() {
                 style={styles.viewProfileButton}
                 onPress={() => router.push(`/user/${listing.seller_id}`)}
               >
-                <Text style={styles.viewProfileButtonText}>Voir profil</Text>
+                <Text style={styles.viewProfileButtonText}>{txt('Voir profil', 'View profile')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -653,7 +728,7 @@ export default function ListingDetailScreen() {
               style={styles.safetyButton}
               onPress={() => setShowSafetyGuide(!showSafetyGuide)}
             >
-              <Text style={styles.safetyButtonText}>🛡️ Conseils de sécurité</Text>
+              <Text style={styles.safetyButtonText}>{txt('🛡️ Conseils de sécurité', '🛡️ Safety tips')}</Text>
               <Text style={styles.safetyButtonIcon}>
                 {showSafetyGuide ? '▲' : '▼'}
               </Text>
@@ -663,67 +738,67 @@ export default function ListingDetailScreen() {
               <View style={styles.safetyGuide}>
                 <ScrollView style={styles.safetyContent} nestedScrollEnabled={true}>
                   <Text style={styles.safetyTitle}>
-                    🛡️ Guide de Sécurité — Évitez les Arnaques sur Marché.cd
+                    {txt('🛡️ Guide de Sécurité — Évitez les Arnaques sur Marché.cd', '🛡️ Safety Guide — Avoid Scams on Marché.cd')}
                   </Text>
                   <Text style={styles.safetyIntro}>
-                    Chez Marché.cd, nous voulons que chaque utilisateur achète et vende en toute confiance. Voici quelques conseils importants pour vous protéger contre les arnaques et les mauvaises expériences.
+                    {txt('Chez Marché.cd, nous voulons que chaque utilisateur achète et vende en toute confiance. Voici quelques conseils importants pour vous protéger contre les arnaques et les mauvaises expériences.', 'At Marché.cd, we want every user to buy and sell with confidence. Here are key tips to protect you from scams and bad experiences.')}
                   </Text>
 
                   <View style={styles.safetyTip}>
-                    <Text style={styles.safetyTipTitle}>⚠️ 1. Ne payez jamais avant d'avoir vu le produit</Text>
-                    <Text style={styles.safetyTipText}>• Ne versez aucun acompte avant d'avoir rencontré le vendeur.</Text>
-                    <Text style={styles.safetyTipText}>• Vérifiez le produit en personne avant de payer.</Text>
-                    <Text style={styles.safetyTipText}>• Si possible, rencontrez-vous dans un lieu public et sûr (ex. centre commercial, station-service).</Text>
+                    <Text style={styles.safetyTipTitle}>{txt("⚠️ 1. Ne payez jamais avant d'avoir vu le produit", '⚠️ 1. Never pay before seeing the product')}</Text>
+                    <Text style={styles.safetyTipText}>{txt("• Ne versez aucun acompte avant d'avoir rencontré le vendeur.", '• Do not pay any deposit before meeting the seller.')}</Text>
+                    <Text style={styles.safetyTipText}>{txt('• Vérifiez le produit en personne avant de payer.', '• Check the product in person before paying.')}</Text>
+                    <Text style={styles.safetyTipText}>{txt('• Si possible, rencontrez-vous dans un lieu public et sûr (ex. centre commercial, station-service).', '• If possible, meet in a safe public place (e.g., mall, gas station).')}</Text>
                   </View>
 
                   <View style={styles.safetyTip}>
-                    <Text style={styles.safetyTipTitle}>🧾 2. Méfiez-vous des prix trop bas</Text>
-                    <Text style={styles.safetyTipText}>• Si le prix est trop beau pour être vrai, il y a probablement un problème.</Text>
-                    <Text style={styles.safetyTipText}>• Comparez les prix d'autres annonces similaires avant de décider.</Text>
+                    <Text style={styles.safetyTipTitle}>{txt('🧾 2. Méfiez-vous des prix trop bas', '🧾 2. Be careful with very low prices')}</Text>
+                    <Text style={styles.safetyTipText}>{txt('• Si le prix est trop beau pour être vrai, il y a probablement un problème.', '• If the price is too good to be true, there is likely a problem.')}</Text>
+                    <Text style={styles.safetyTipText}>{txt("• Comparez les prix d'autres annonces similaires avant de décider.", '• Compare prices from similar listings before deciding.')}</Text>
                   </View>
 
                   <View style={styles.safetyTip}>
-                    <Text style={styles.safetyTipTitle}>💬 3. Communiquez toujours via WhatsApp</Text>
-                    <Text style={styles.safetyTipText}>• Évitez de partager vos informations personnelles (carte d'identité, numéro de compte, etc.).</Text>
-                    <Text style={styles.safetyTipText}>• Si quelqu'un refuse de parler sur WhatsApp ou d'envoyer des photos réelles, soyez prudent.</Text>
+                    <Text style={styles.safetyTipTitle}>{txt('💬 3. Communiquez toujours via WhatsApp', '💬 3. Communicate via WhatsApp')}</Text>
+                    <Text style={styles.safetyTipText}>{txt("• Évitez de partager vos informations personnelles (carte d'identité, numéro de compte, etc.).", '• Avoid sharing personal information (ID card, bank details, etc.).')}</Text>
+                    <Text style={styles.safetyTipText}>{txt("• Si quelqu'un refuse de parler sur WhatsApp ou d'envoyer des photos réelles, soyez prudent.", '• If someone refuses WhatsApp or real photos, be careful.')}</Text>
                   </View>
 
                   <View style={styles.safetyTip}>
-                    <Text style={styles.safetyTipTitle}>👤 4. Vérifiez le profil du vendeur</Text>
-                    <Text style={styles.safetyTipText}>• Regardez depuis combien de temps il est sur la plateforme.</Text>
-                    <Text style={styles.safetyTipText}>• Les vendeurs actifs et avec plusieurs annonces récentes sont généralement plus fiables.</Text>
+                    <Text style={styles.safetyTipTitle}>{txt('👤 4. Vérifiez le profil du vendeur', '👤 4. Check the seller profile')}</Text>
+                    <Text style={styles.safetyTipText}>{txt('• Regardez depuis combien de temps il est sur la plateforme.', '• Check how long they have been on the platform.')}</Text>
+                    <Text style={styles.safetyTipText}>{txt('• Les vendeurs actifs et avec plusieurs annonces récentes sont généralement plus fiables.', '• Active sellers with recent listings are generally more reliable.')}</Text>
                   </View>
 
                   <View style={styles.safetyTip}>
-                    <Text style={styles.safetyTipTitle}>💰 5. Utilisez les paiements sécurisés</Text>
-                    <Text style={styles.safetyTipText}>• Ne transférez jamais d'argent avant d'avoir reçu le produit.</Text>
-                    <Text style={styles.safetyTipText}>• Privilégiez le paiement en main propre ou via un service de paiement sécurisé.</Text>
-                    <Text style={styles.safetyTipText}>• Évitez les paiements à distance à des inconnus.</Text>
+                    <Text style={styles.safetyTipTitle}>{txt('💰 5. Utilisez les paiements sécurisés', '💰 5. Use secure payments')}</Text>
+                    <Text style={styles.safetyTipText}>{txt("• Ne transférez jamais d'argent avant d'avoir reçu le produit.", '• Never transfer money before receiving the product.')}</Text>
+                    <Text style={styles.safetyTipText}>{txt('• Privilégiez le paiement en main propre ou via un service de paiement sécurisé.', '• Prefer in-person payment or a secure payment service.')}</Text>
+                    <Text style={styles.safetyTipText}>{txt('• Évitez les paiements à distance à des inconnus.', '• Avoid remote payments to strangers.')}</Text>
                   </View>
 
                   <View style={styles.safetyTip}>
-                    <Text style={styles.safetyTipTitle}>🕵️ 6. Signalez les comportements suspects</Text>
-                    <Text style={styles.safetyTipText}>• Si un vendeur vous semble louche, signalez-le immédiatement à notre équipe via l'application.</Text>
-                    <Text style={styles.safetyTipText}>• Nous supprimons rapidement les annonces et comptes frauduleux.</Text>
+                    <Text style={styles.safetyTipTitle}>{txt('🕵️ 6. Signalez les comportements suspects', '🕵️ 6. Report suspicious behavior')}</Text>
+                    <Text style={styles.safetyTipText}>{txt("• Si un vendeur vous semble louche, signalez-le immédiatement à notre équipe via l'application.", '• If a seller seems suspicious, report them to our team immediately in the app.')}</Text>
+                    <Text style={styles.safetyTipText}>{txt('• Nous supprimons rapidement les annonces et comptes frauduleux.', '• We quickly remove fraudulent listings and accounts.')}</Text>
                   </View>
 
                   <View style={styles.safetyTip}>
-                    <Text style={styles.safetyTipTitle}>📵 7. Ne partagez pas d'informations sensibles</Text>
-                    <Text style={styles.safetyTipText}>• Ne donnez jamais vos codes OTP, mots de passe ou informations bancaires à qui que ce soit.</Text>
-                    <Text style={styles.safetyTipText}>• Marché.cd ne vous demandera jamais ces informations.</Text>
+                    <Text style={styles.safetyTipTitle}>{txt("📵 7. Ne partagez pas d'informations sensibles", '📵 7. Do not share sensitive information')}</Text>
+                    <Text style={styles.safetyTipText}>{txt('• Ne donnez jamais vos codes OTP, mots de passe ou informations bancaires à qui que ce soit.', '• Never share OTP codes, passwords, or banking information with anyone.')}</Text>
+                    <Text style={styles.safetyTipText}>{txt('• Marché.cd ne vous demandera jamais ces informations.', '• Marché.cd will never ask for this information.')}</Text>
                   </View>
 
                   <View style={styles.safetyDisclaimer}>
-                    <Text style={styles.safetyDisclaimerTitle}>⚖️ Responsabilité</Text>
+                    <Text style={styles.safetyDisclaimerTitle}>{txt('⚖️ Responsabilité', '⚖️ Responsibility')}</Text>
                     <Text style={styles.safetyDisclaimerText}>
-                      Marché.cd met tout en œuvre pour offrir une plateforme sûre, mais chaque utilisateur reste responsable de ses transactions. Nous ne sommes pas responsables des pertes financières, arnaques ou litiges résultant du non-respect de ces conseils de sécurité.
+                      {txt('Marché.cd met tout en œuvre pour offrir une plateforme sûre, mais chaque utilisateur reste responsable de ses transactions. Nous ne sommes pas responsables des pertes financières, arnaques ou litiges résultant du non-respect de ces conseils de sécurité.', 'Marché.cd does its best to provide a safe platform, but each user remains responsible for their transactions. We are not responsible for financial losses, scams, or disputes resulting from not following these safety tips.')}
                     </Text>
                   </View>
 
                   <View style={styles.safetySummary}>
-                    <Text style={styles.safetySummaryTitle}>💚 En résumé</Text>
+                    <Text style={styles.safetySummaryTitle}>{txt('💚 En résumé', '💚 In summary')}</Text>
                     <Text style={styles.safetySummaryText}>
-                      Restez vigilant, vérifiez toujours avant de payer, et privilégiez la rencontre en personne. Ensemble, faisons de Marché.cd un espace sûr et de confiance pour tous les Congolais 🇨🇩.
+                      {txt('Restez vigilant, vérifiez toujours avant de payer, et privilégiez la rencontre en personne. Ensemble, faisons de Marché.cd un espace sûr et de confiance pour tous les Congolais 🇨🇩.', 'Stay alert, always verify before paying, and prefer meeting in person. Together, let’s keep Marché.cd safe and trusted for everyone 🇨🇩.')}
                     </Text>
                   </View>
                 </ScrollView>
@@ -743,27 +818,27 @@ export default function ListingDetailScreen() {
                 onPress={() => setShowPromoteModal(true)}
               >
                 <Sparkles size={18} color="#fff" />
-                <Text style={styles.promoteButtonQuickText}>Promouvoir</Text>
+                <Text style={styles.promoteButtonQuickText}>{txt('Promouvoir', 'Promote')}</Text>
               </TouchableOpacity>
             )}
             {listing.is_promoted && (
               <View style={styles.promotedIndicator}>
                 <Sparkles size={16} color="#fbbf24" />
-                <Text style={styles.promotedIndicatorText}>Annonce promue</Text>
+                <Text style={styles.promotedIndicatorText}>{txt('Annonce promue', 'Promoted listing')}</Text>
               </View>
             )}
           </View>
           <View style={styles.footer}>
             <View style={styles.priceSection}>
               <Text style={styles.footerPrice}>${listing.price.toLocaleString('en-US')}</Text>
-              <Text style={styles.deliveryText}>Votre annonce</Text>
+              <Text style={styles.deliveryText}>{txt('Votre annonce', 'Your listing')}</Text>
             </View>
             
             <TouchableOpacity 
               style={styles.editButtonFooter} 
               onPress={() => router.push(`/edit-listing/${id}`)}
             >
-              <Text style={styles.editButtonText}>Modifier l'annonce</Text>
+              <Text style={styles.editButtonText}>{txt("Modifier l'annonce", 'Edit listing')}</Text>
             </TouchableOpacity>
           </View>
         </>
@@ -777,7 +852,7 @@ export default function ListingDetailScreen() {
               onPress={handleIsAvailable}
             >
               <MessageCircle size={18} color={Colors.primary} />
-              <Text style={styles.quickActionText}>Est-ce disponible?</Text>
+              <Text style={styles.quickActionText}>{txt('Est-ce disponible?', 'Is this available?')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -785,7 +860,7 @@ export default function ListingDetailScreen() {
               onPress={handleMakeOffer}
             >
               <DollarSign size={18} color={Colors.primary} />
-              <Text style={styles.quickActionText}>Faire une offre</Text>
+              <Text style={styles.quickActionText}>{txt('Faire une offre', 'Make an offer')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -793,7 +868,7 @@ export default function ListingDetailScreen() {
               onPress={handleCustomMessage}
             >
               <MessageCircle size={18} color={Colors.primary} />
-              <Text style={styles.quickActionText}>Message personnalisé</Text>
+              <Text style={styles.quickActionText}>{txt('Message personnalisé', 'Custom message')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -801,14 +876,20 @@ export default function ListingDetailScreen() {
           <View style={styles.footer}>
             <View style={styles.priceSection}>
               <Text style={styles.footerPrice}>{formatPrice(listing.price)}</Text>
-              <Text style={styles.deliveryText}>Livraison disponible</Text>
+              <Text style={styles.deliveryText}>{txt('Livraison disponible', 'Delivery available')}</Text>
             </View>
             
             <TouchableOpacity 
+              ref={messageButtonRef}
               style={styles.messageButton} 
               onPress={() => {
-                const greeting = `Bonjour! Je suis intéressé par "${listing.title}" et j'aimerais l'acheter.`;
+                const greeting = txt(
+                  `Bonjour! Je suis intéressé par "${listing.title}" et j'aimerais l'acheter.`,
+                  `Hi! I'm interested in "${listing.title}" and I'd like to buy it.`
+                );
                 handleQuickMessage(greeting);
+                // Reset idle timer on interaction
+                if (idleTimer) clearTimeout(idleTimer);
               }}
             >
               <MessageCircle size={24} color="#fff" />
@@ -878,21 +959,21 @@ export default function ListingDetailScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.offerModalContainer}>
             <View style={styles.offerModalHeader}>
-              <Text style={styles.offerModalTitle}>Faire une offre</Text>
+              <Text style={styles.offerModalTitle}>{txt('Faire une offre', 'Make an offer')}</Text>
               <TouchableOpacity onPress={() => setShowOfferModal(false)}>
                 <X size={24} color="#64748b" />
               </TouchableOpacity>
             </View>
             
             <Text style={styles.offerModalSubtitle}>
-              Prix demandé: {formatPrice(listing?.price || 0)}
+              {txt('Asking price', 'Asking price')}: {formatPrice(listing?.price || 0)}
             </Text>
             
             <View style={styles.offerInputContainer}>
-              <Text style={styles.offerInputLabel}>Votre offre (USD)</Text>
+              <Text style={styles.offerInputLabel}>{txt('Votre offre (USD)', 'Your offer (USD)')}</Text>
               <TextInput
                 style={styles.offerInput}
-                placeholder="Entrez votre offre"
+                placeholder={txt('Entrez votre offre', 'Enter your offer')}
                 keyboardType="numeric"
                 value={offerAmount}
                 onChangeText={setOfferAmount}
@@ -908,14 +989,14 @@ export default function ListingDetailScreen() {
                   setOfferAmount('');
                 }}
               >
-                <Text style={styles.offerCancelButtonText}>Annuler</Text>
+                <Text style={styles.offerCancelButtonText}>{txt('Annuler', 'Cancel')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
                 style={styles.offerSubmitButton}
                 onPress={submitOffer}
               >
-                <Text style={styles.offerSubmitButtonText}>Envoyer l'offre</Text>
+                <Text style={styles.offerSubmitButtonText}>{txt("Envoyer l'offre", 'Send offer')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -932,17 +1013,17 @@ export default function ListingDetailScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.offerModalContainer}>
             <View style={styles.offerModalHeader}>
-              <Text style={styles.offerModalTitle}>Message personnalisé</Text>
+              <Text style={styles.offerModalTitle}>{txt('Message personnalisé', 'Custom message')}</Text>
               <TouchableOpacity onPress={() => setShowCustomMessageModal(false)}>
                 <X size={24} color="#64748b" />
               </TouchableOpacity>
             </View>
             
             <View style={styles.offerInputContainer}>
-              <Text style={styles.offerInputLabel}>Votre message</Text>
+              <Text style={styles.offerInputLabel}>{txt('Votre message', 'Your message')}</Text>
               <TextInput
                 style={[styles.offerInput, styles.customMessageInput]}
-                placeholder="Écrivez votre message..."
+                placeholder={txt('Écrivez votre message...', 'Write your message...')}
                 multiline
                 numberOfLines={4}
                 value={customMessage}
@@ -959,14 +1040,14 @@ export default function ListingDetailScreen() {
                   setCustomMessage('');
                 }}
               >
-                <Text style={styles.offerCancelButtonText}>Annuler</Text>
+                <Text style={styles.offerCancelButtonText}>{txt('Annuler', 'Cancel')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
                 style={styles.offerSubmitButton}
                 onPress={submitCustomMessage}
               >
-                <Text style={styles.offerSubmitButtonText}>Envoyer</Text>
+                <Text style={styles.offerSubmitButtonText}>{txt('Envoyer', 'Send')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -982,7 +1063,10 @@ export default function ListingDetailScreen() {
         }}
         onProceed={() => {
           // Use the pending message if available, otherwise use default greeting
-          const messageToSend = pendingMessage || `Bonjour! Je suis intéressé par "${listing?.title}" et j'aimerais l'acheter.`;
+          const messageToSend = pendingMessage || txt(
+            `Bonjour! Je suis intéressé par "${listing?.title}" et j'aimerais l'acheter.`,
+            `Hi! I'm interested in "${listing?.title}" and I'd like to buy it.`
+          );
           proceedToChat(messageToSend);
           setPendingMessage(''); // Clear after using
         }}
@@ -1026,6 +1110,110 @@ export default function ListingDetailScreen() {
           }
         }}
       />
+
+      {/* Guidance: Contact Seller Tooltip */}
+      {!loading && listing && user?.id !== listing.seller_id && (
+        <Tooltip
+          content={{
+            id: 'listing_contact_seller',
+            title: txt('Contacter le vendeur', 'Contact seller'),
+            message: txt('Appuyez ici pour envoyer un message au vendeur et poser vos questions.', 'Tap here to message the seller and ask questions.'),
+            placement: 'top',
+            icon: 'chatbubble-outline',
+            dismissLabel: txt('Compris', 'Got it'),
+          }}
+          targetRef={messageButtonRef}
+          visible={showContactTooltip}
+          onDismiss={() => {
+            setShowContactTooltip(false);
+            guidance.markTooltipDismissed('listing_contact_seller');
+          }}
+        />
+      )}
+
+      {/* Guidance: Image Swipe Hint */}
+      {!loading && listing && images.length > 1 && (
+        <ContextualPrompt
+          message={txt('💡 Astuce : Faites glisser les images pour voir toutes les photos de cet article.', '💡 Tip: Swipe images to see all photos of this item.')}
+          actions={[]}
+          visible={showImageSwipeHint}
+          onDismiss={() => {
+            setShowImageSwipeHint(false);
+            guidance.markTooltipDismissed('listing_image_swipe');
+          }}
+          icon="images-outline"
+        />
+      )}
+
+      {/* Guidance: Quick Actions Prompt */}
+      {!loading && listing && user?.id !== listing.seller_id && (
+        <ContextualPrompt
+          message={txt("Besoin d'aide ? Essayez ces actions rapides pour contacter le vendeur.", 'Need help? Try these quick actions to contact the seller.')}
+          actions={[
+            {
+              label: txt('Message vendeur', 'Message seller'),
+              onPress: () => {
+                const greeting = txt(
+                  `Bonjour! Je suis intéressé par "${listing.title}" et j'aimerais l'acheter.`,
+                  `Hi! I'm interested in "${listing.title}" and I'd like to buy it.`
+                );
+                handleQuickMessage(greeting);
+              },
+              primary: true,
+            },
+            {
+              label: txt('Sauvegarder', 'Save'),
+              onPress: toggleFavorite,
+            },
+          ]}
+          visible={showQuickActionsPrompt}
+          onDismiss={() => {
+            setShowQuickActionsPrompt(false);
+            guidance.markTooltipDismissed('listing_quick_actions');
+          }}
+          icon="flash-outline"
+        />
+      )}
+
+      {/* Guidance: Favorite Confirmation */}
+      {!loading && listing && (
+        <ContextualPrompt
+          message={txt('✅ Article ajouté aux favoris ! Retrouvez-le dans votre liste de favoris.', '✅ Item added to favorites! Find it in your favorites list.')}
+          actions={[
+            {
+              label: txt('Voir mes favoris', 'View my favorites'),
+              onPress: () => router.push('/favorites'),
+              primary: true,
+            },
+          ]}
+          visible={showFavoriteConfirmation}
+          onDismiss={() => {
+            setShowFavoriteConfirmation(false);
+            guidance.markTooltipDismissed('listing_favorite_confirmation');
+          }}
+          icon="heart-outline"
+        />
+      )}
+
+      {/* Guidance: Seller Profile Tooltip */}
+      {!loading && listing && (
+        <Tooltip
+          content={{
+            id: 'listing_seller_profile',
+            title: txt('Profil du vendeur', 'Seller profile'),
+            message: txt('Vérifiez toujours le profil du vendeur, ses notes et son historique. Rencontrez-vous dans un lieu public et sûr.', 'Always check the seller profile, ratings, and history. Meet in a safe public place.'),
+            placement: 'bottom',
+            icon: 'shield-checkmark-outline',
+            dismissLabel: txt('Compris', 'Got it'),
+          }}
+          targetRef={sellerCardRef}
+          visible={showSellerProfileTooltip}
+          onDismiss={() => {
+            setShowSellerProfileTooltip(false);
+            guidance.markTooltipDismissed('listing_seller_profile');
+          }}
+        />
+      )}
       </View>
     </SafeAreaView>
   );

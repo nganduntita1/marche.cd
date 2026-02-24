@@ -38,6 +38,11 @@ import { useLocation } from '@/contexts/LocationContext';
 import { calculateDistance, formatDistance } from '@/services/locationService';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
+import { useGuidance } from '@/contexts/GuidanceContext';
+import { GuidedTour } from '@/components/guidance/GuidedTour';
+import { Tooltip } from '@/components/guidance/Tooltip';
+import { ContextualPrompt } from '@/components/guidance/ContextualPrompt';
+import { SearchFilterGuidance } from '@/components/guidance/SearchFilterGuidance';
 
 // Major cities in DRC (includes user examples like Kipushi & Lubumbashi)
 // Location picker disabled for now
@@ -45,7 +50,9 @@ import { TextStyles } from '@/constants/Typography';
 export default function HomeScreen() {
   const { user } = useAuth();
   const { userLocation, currentCity, loading: locationLoading, refreshLocation, setManualLocation } = useLocation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const guidance = useGuidance();
   const [listings, setListings] = useState<ListingWithDetails[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -69,6 +76,19 @@ export default function HomeScreen() {
   const lastScrollY = useRef(0);
   const headerTranslateY = useRef(new Animated.Value(-100)).current;
   const headerOpacity = useRef(new Animated.Value(0)).current;
+
+  // Guidance state
+  const [showHomeTour, setShowHomeTour] = useState(false);
+  const [showSearchTooltip, setShowSearchTooltip] = useState(false);
+  const [showLocationTooltip, setShowLocationTooltip] = useState(false);
+  const [showInactivityPrompt, setShowInactivityPrompt] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef = useRef<TextInput>(null);
+  const locationSelectorRef = useRef<View>(null);
+  const filterButtonRef = useRef<View>(null);
+  const priceFilterRef = useRef<View>(null);
+  const locationFilterRef = useRef<View>(null);
 
   useEffect(() => {
     loadCategories();
@@ -117,6 +137,59 @@ export default function HomeScreen() {
       supabase.removeChannel(favoritesSubscription);
     };
   }, [selectedCategory, user, sortBy, priceRange]);
+
+  // Initialize home screen guidance
+  useEffect(() => {
+    const initializeGuidance = async () => {
+      // Increment screen view count
+      await guidance.incrementScreenView('home');
+
+      // Check if we should show the home tour
+      if (guidance.shouldShowTour('home_tour')) {
+        // Small delay to let the screen render
+        setTimeout(() => {
+          setShowHomeTour(true);
+        }, 500);
+      } else {
+        // Show individual tooltips if tour is completed
+        if (guidance.shouldShowTooltip('home_search')) {
+          setTimeout(() => {
+            setShowSearchTooltip(true);
+          }, 1000);
+        }
+      }
+    };
+
+    initializeGuidance();
+  }, []);
+
+  // Inactivity detection - show prompt after 10 seconds of no interaction
+  useEffect(() => {
+    if (!hasInteracted && !showHomeTour) {
+      // Start inactivity timer
+      inactivityTimerRef.current = setTimeout(() => {
+        if (!hasInteracted && guidance.shouldShowPrompt('home_inactivity')) {
+          setShowInactivityPrompt(true);
+        }
+      }, 10000); // 10 seconds
+    }
+
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [hasInteracted, showHomeTour]);
+
+  // Mark interaction when user does anything
+  const markInteraction = () => {
+    if (!hasInteracted) {
+      setHasInteracted(true);
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -385,17 +458,29 @@ export default function HomeScreen() {
         <View style={styles.searchContainer}>
           <Search size={20} color="#94a3b8" />
           <TextInput
+            ref={searchInputRef}
             style={styles.searchInput}
-            placeholder="Rechercher"
+            placeholder={isFrench ? 'Rechercher' : 'Search'}
             placeholderTextColor="#94a3b8"
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(text) => {
+              setSearchQuery(text);
+              markInteraction();
+            }}
+            onFocus={() => {
+              markInteraction();
+              setShowSearchTooltip(false);
+            }}
             underlineColorAndroid="transparent"
           />
         </View>
         <TouchableOpacity 
+          ref={filterButtonRef as any}
           style={styles.sortButton}
-          onPress={() => setShowPriceModal(true)}
+          onPress={() => {
+            setShowPriceModal(true);
+            markInteraction();
+          }}
         >
           <SlidersHorizontal size={24} color="#fff" strokeWidth={2} />
         </TouchableOpacity>
@@ -421,7 +506,7 @@ export default function HomeScreen() {
               !selectedCategory && styles.categoryChipTextActive,
             ]}
           >
-            Tous
+            {isFrench ? 'Tous' : 'All'}
           </Text>
         </TouchableOpacity>
         
@@ -454,11 +539,13 @@ export default function HomeScreen() {
     if (!currentCity) return null;
 
     return (
-      <View style={styles.locationSelectorContainer}>
+      <View style={styles.locationSelectorContainer} ref={locationSelectorRef}>
         <TouchableOpacity 
           style={styles.locationSelector}
           onPress={() => {
             setShowCityPicker(true);
+            markInteraction();
+            setShowLocationTooltip(false);
           }}
         >
           <Ionicons name="location-outline" size={20} color={Colors.primary} />
@@ -474,7 +561,10 @@ export default function HomeScreen() {
         {userLocation && (
           <TouchableOpacity 
             style={styles.radiusSelector}
-            onPress={() => setShowRadiusModal(true)}
+            onPress={() => {
+              setShowRadiusModal(true);
+              markInteraction();
+            }}
           >
             <Ionicons name="radio-outline" size={16} color={Colors.textSecondary} />
             <Text style={styles.radiusText}>
@@ -519,7 +609,15 @@ export default function HomeScreen() {
             const isOwner = user?.id === item.seller_id;
             
             return (
-              <View key={item.id} style={styles.listingCardContainer}>
+              <TouchableOpacity 
+                key={item.id} 
+                style={styles.listingCardContainer}
+                onPress={() => {
+                  markInteraction();
+                  router.push(`/listing/${item.id}`);
+                }}
+                activeOpacity={0.9}
+              >
                 <ListingCard
                   id={item.id}
                   title={item.title}
@@ -534,7 +632,7 @@ export default function HomeScreen() {
                   isPromoted={item.is_promoted}
                   onDelete={loadListings}
                 />
-              </View>
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -598,11 +696,11 @@ export default function HomeScreen() {
                 <View style={styles.emptyStateIcon}>
                   <Package size={48} color="#cbd5e1" />
                 </View>
-                <Text style={styles.emptyStateTitle}>Aucune annonce trouvée</Text>
+                <Text style={styles.emptyStateTitle}>{isFrench ? 'Aucune annonce trouvée' : 'No listings found'}</Text>
                 <Text style={styles.emptyStateText}>
                   {searchQuery 
-                    ? 'Aucun résultat pour votre recherche'
-                    : 'Essayez de modifier vos critères de recherche'}
+                    ? (isFrench ? 'Aucun résultat pour votre recherche' : 'No results for your search')
+                    : (isFrench ? 'Essayez de modifier vos critères de recherche' : 'Try changing your search criteria')}
                 </Text>
                 {(searchQuery || selectedCategory) && (
                   <TouchableOpacity 
@@ -612,7 +710,7 @@ export default function HomeScreen() {
                       setSelectedCategory(null);
                     }}
                   >
-                    <Text style={styles.resetButtonText}>Réinitialiser les filtres</Text>
+                    <Text style={styles.resetButtonText}>{isFrench ? 'Réinitialiser les filtres' : 'Reset filters'}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -640,11 +738,11 @@ export default function HomeScreen() {
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={styles.modalTitle}>Filtres</Text>
+            <Text style={styles.modalTitle}>{isFrench ? 'Filtres' : 'Filters'}</Text>
             
             {/* Price Range */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Fourchette de prix ($)</Text>
+              <Text style={styles.filterLabel}>{isFrench ? 'Fourchette de prix ($)' : 'Price range ($)'}</Text>
               <View style={styles.priceInputRow}>
                 <TextInput
                   style={styles.priceInput}
@@ -668,7 +766,7 @@ export default function HomeScreen() {
 
             {/* Quick Price Ranges */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Gammes rapides</Text>
+              <Text style={styles.filterLabel}>{isFrench ? 'Gammes rapides' : 'Quick ranges'}</Text>
               <View style={styles.quickRanges}>
                 <TouchableOpacity 
                   style={styles.quickRangeChip}
@@ -699,13 +797,13 @@ export default function HomeScreen() {
 
             {/* Sort Options */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Trier par</Text>
+              <Text style={styles.filterLabel}>{isFrench ? 'Trier par' : 'Sort by'}</Text>
               <TouchableOpacity 
                 style={[styles.sortOption, sortBy === 'recent' && styles.sortOptionActive]}
                 onPress={() => setSortBy('recent')}
               >
                 <Text style={[styles.sortOptionText, sortBy === 'recent' && styles.sortOptionTextActive]}>
-                  Plus récents
+                  {isFrench ? 'Plus récents' : 'Most recent'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity 
@@ -713,7 +811,7 @@ export default function HomeScreen() {
                 onPress={() => setSortBy('price_low')}
               >
                 <Text style={[styles.sortOptionText, sortBy === 'price_low' && styles.sortOptionTextActive]}>
-                  Prix croissant
+                  {isFrench ? 'Prix croissant' : 'Price: low to high'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity 
@@ -721,7 +819,7 @@ export default function HomeScreen() {
                 onPress={() => setSortBy('price_high')}
               >
                 <Text style={[styles.sortOptionText, sortBy === 'price_high' && styles.sortOptionTextActive]}>
-                  Prix décroissant
+                  {isFrench ? 'Prix décroissant' : 'Price: high to low'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -736,7 +834,7 @@ export default function HomeScreen() {
                   setSortBy('recent');
                 }}
               >
-                <Text style={styles.modalResetButtonText}>Réinitialiser</Text>
+                <Text style={styles.modalResetButtonText}>{isFrench ? 'Réinitialiser' : 'Reset'}</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.applyButton}
@@ -745,7 +843,7 @@ export default function HomeScreen() {
                   setShowPriceModal(false);
                 }}
               >
-                <Text style={styles.applyButtonText}>Appliquer</Text>
+                <Text style={styles.applyButtonText}>{isFrench ? 'Appliquer' : 'Apply'}</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -817,6 +915,162 @@ export default function HomeScreen() {
         onDetectLocation={() => {
           refreshLocation();
           setShowCityPicker(false);
+        }}
+      />
+
+      {/* Guidance Components */}
+      {/* Home Tour */}
+      {showHomeTour && (() => {
+        const tour = {
+          id: 'home_tour',
+          name: 'Home Screen Tour',
+          steps: [
+            {
+              id: 'home_step_1',
+              title: isFrench ? 'Bienvenue ! 🏠' : 'Welcome Home! 🏠',
+              message: isFrench 
+                ? 'C\'est ici que vous trouverez tous les articles disponibles. Explorons les fonctionnalités principales !'
+                : 'This is where you\'ll find all available items. Let\'s explore the main features!',
+              placement: 'center' as const,
+              showOverlay: true,
+              nextLabel: isFrench ? 'Montrez-moi' : 'Show me',
+              skipLabel: isFrench ? 'Passer' : 'Skip',
+            },
+            {
+              id: 'home_step_2',
+              title: isFrench ? 'Barre de recherche' : 'Search Bar',
+              message: isFrench
+                ? 'Recherchez tout ce dont vous avez besoin - électronique, meubles, vêtements, et plus encore !'
+                : 'Search for anything you need - electronics, furniture, clothes, and more!',
+              placement: 'bottom' as const,
+              showOverlay: true,
+              nextLabel: isFrench ? 'Suivant' : 'Next',
+            },
+            {
+              id: 'home_step_3',
+              title: isFrench ? 'Filtre de localisation' : 'Location Filter',
+              message: isFrench
+                ? 'Voyez les articles près de vous ! Appuyez ici pour définir votre position et le rayon de recherche.'
+                : 'See items near you! Tap here to set your location and search radius.',
+              placement: 'bottom' as const,
+              showOverlay: true,
+              nextLabel: isFrench ? 'Suivant' : 'Next',
+            },
+            {
+              id: 'home_step_4',
+              title: isFrench ? 'Parcourir les annonces' : 'Browse Listings',
+              message: isFrench
+                ? 'Appuyez sur n\'importe quel article pour voir les détails, photos et contacter le vendeur. Bon shopping !'
+                : 'Tap any item to see details, photos, and contact the seller. Happy shopping!',
+              placement: 'center' as const,
+              showOverlay: true,
+              nextLabel: isFrench ? 'Commencer' : 'Start Browsing',
+            },
+          ],
+          triggerCondition: {
+            type: 'first_visit' as const,
+            params: { screen: 'home' },
+          },
+        };
+        
+        return (
+          <GuidedTour
+            tour={tour}
+            visible={showHomeTour}
+            onComplete={async () => {
+              await guidance.markTourCompleted('home_tour');
+              setShowHomeTour(false);
+              // Show search tooltip after tour
+              setTimeout(() => {
+                if (guidance.shouldShowTooltip('home_search')) {
+                  setShowSearchTooltip(true);
+                }
+              }, 500);
+            }}
+            onSkip={async () => {
+              await guidance.markTourCompleted('home_tour');
+              setShowHomeTour(false);
+            }}
+          />
+        );
+      })()}
+
+      {/* Search Tooltip */}
+      {showSearchTooltip && guidance.getTooltipContent('home_search') && (
+        <Tooltip
+          content={guidance.getTooltipContent('home_search')!}
+          targetRef={searchInputRef as any}
+          visible={showSearchTooltip}
+          onDismiss={async () => {
+            await guidance.markTooltipDismissed('home_search');
+            setShowSearchTooltip(false);
+            // Show location tooltip after search tooltip
+            if (guidance.shouldShowTooltip('home_location')) {
+              setTimeout(() => {
+                setShowLocationTooltip(true);
+              }, 500);
+            }
+          }}
+        />
+      )}
+
+      {/* Location Tooltip */}
+      {showLocationTooltip && guidance.getTooltipContent('home_location') && (
+        <Tooltip
+          content={guidance.getTooltipContent('home_location')!}
+          targetRef={locationSelectorRef as any}
+          visible={showLocationTooltip}
+          onDismiss={async () => {
+            await guidance.markTooltipDismissed('home_location');
+            setShowLocationTooltip(false);
+          }}
+        />
+      )}
+
+      {/* Inactivity Prompt */}
+      {showInactivityPrompt && (
+        <ContextualPrompt
+          message={isFrench 
+            ? 'Besoin d\'aide ? Appuyez sur n\'importe quel article pour voir plus de détails !'
+            : 'Need help? Tap any item to see more details!'}
+          actions={[
+            {
+              label: isFrench ? 'Compris' : 'Got it',
+              onPress: async () => {
+                await guidance.markTooltipDismissed('home_inactivity');
+                setShowInactivityPrompt(false);
+                markInteraction();
+              },
+            },
+          ]}
+          visible={showInactivityPrompt}
+          onDismiss={async () => {
+            await guidance.markTooltipDismissed('home_inactivity');
+            setShowInactivityPrompt(false);
+            markInteraction();
+          }}
+          icon="help-circle-outline"
+        />
+      )}
+
+      {/* Search and Filter Guidance */}
+      <SearchFilterGuidance
+        searchQuery={searchQuery}
+        hasSearchResults={filteredListings.length > 0}
+        resultsCount={filteredListings.length}
+        isFilterPanelOpen={showPriceModal}
+        selectedCategory={selectedCategory}
+        priceRange={priceRange}
+        searchRadius={searchRadius}
+        searchInputRef={searchInputRef}
+        filterButtonRef={filterButtonRef}
+        priceFilterRef={priceFilterRef}
+        locationFilterRef={locationFilterRef}
+        onSearchFocus={() => {
+          searchInputRef.current?.focus();
+        }}
+        onFilterOpen={() => {
+          setShowPriceModal(true);
         }}
       />
       </View>

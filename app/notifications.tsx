@@ -14,8 +14,10 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, Star, Bell, CheckCircle } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuidance } from '@/contexts/GuidanceContext';
 import Colors from '@/constants/Colors';
 import RatingModal from '@/components/RatingModal';
+import { NotificationsGuidance } from '@/components/guidance';
 
 interface Notification {
   id: string;
@@ -31,6 +33,7 @@ interface Notification {
 export default function NotificationsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { state, shouldShowTooltip, shouldShowTour, incrementScreenView } = useGuidance();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,10 +44,42 @@ export default function NotificationsScreen() {
     revieweeName: string;
     listingId: string;
   } | null>(null);
+  const [showFirstNotificationGuidance, setShowFirstNotificationGuidance] = useState(false);
+  const [showUnreadReminder, setShowUnreadReminder] = useState(false);
+  const [showTypesTour, setShowTypesTour] = useState(false);
 
   useEffect(() => {
     loadNotifications();
+    incrementScreenView('notifications');
   }, []);
+
+  useEffect(() => {
+    if (!loading && notifications.length > 0) {
+      // Show first notification guidance
+      if (shouldShowTooltip('notifications_first')) {
+        setShowFirstNotificationGuidance(true);
+      }
+
+      // Show notification types tour on first visit
+      if (shouldShowTour('notifications_types_tour')) {
+        setTimeout(() => {
+          setShowTypesTour(true);
+        }, 1000);
+      }
+
+      // Check for unread notifications older than 48 hours
+      const unreadNotifications = notifications.filter(n => !n.read);
+      if (unreadNotifications.length > 0) {
+        const oldestUnread = unreadNotifications[unreadNotifications.length - 1];
+        const notificationAge = Date.now() - new Date(oldestUnread.created_at).getTime();
+        const fortyEightHours = 48 * 60 * 60 * 1000;
+
+        if (notificationAge > fortyEightHours && shouldShowTooltip('notifications_unread_reminder')) {
+          setShowUnreadReminder(true);
+        }
+      }
+    }
+  }, [notifications, loading]);
 
   const loadNotifications = async () => {
     try {
@@ -330,6 +365,25 @@ export default function NotificationsScreen() {
           }}
         />
       )}
+
+      {/* Notifications Guidance */}
+      <NotificationsGuidance
+        visible={showFirstNotificationGuidance}
+        isFirstNotification={true}
+        onDismiss={() => setShowFirstNotificationGuidance(false)}
+      />
+
+      <NotificationsGuidance
+        visible={showUnreadReminder}
+        hasUnreadNotifications={true}
+        onDismiss={() => setShowUnreadReminder(false)}
+      />
+
+      <NotificationsGuidance
+        visible={showTypesTour}
+        showTypesTour={true}
+        onDismiss={() => setShowTypesTour(false)}
+      />
     </SafeAreaView>
   );
 }

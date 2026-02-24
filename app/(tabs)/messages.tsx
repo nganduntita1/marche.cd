@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-View,
+  View,
   Text,
   FlatList,
   TouchableOpacity,
@@ -8,20 +8,14 @@ View,
   Image,
   ActivityIndicator,
   TextInput,
-  Alert,
-  Animated,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { MessageCircle, Search, Trash2 } from 'lucide-react-native';
+import { MessageCircle, Bell, Search } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/contexts/MessagesContext';
 import { Conversation } from '@/types/chat';
-import Colors from '@/constants/Colors';
-import { TextStyles } from '@/constants/Typography';
-import NotificationBell from '@/components/NotificationBell';
 
 export default function MessagesScreen() {
   const { user } = useAuth();
@@ -32,8 +26,6 @@ export default function MessagesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastUpdateRef = useRef<Record<string, string>>({});
   const conversationsRef = useRef<Conversation[]>([]);
@@ -444,60 +436,6 @@ export default function MessagesScreen() {
     });
   };
 
-  const deleteConversation = (conversationId: string) => {
-    console.log('deleteConversation called for:', conversationId);
-    setConversationToDelete(conversationId);
-    setShowDeleteModal(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!conversationToDelete) return;
-    
-    console.log('User confirmed deletion');
-    setShowDeleteModal(false);
-    
-    try {
-      // Optimistically remove from UI first
-      setConversations((prev) => {
-        const filtered = prev.filter((conv) => conv.id !== conversationToDelete);
-        console.log('Removed from UI, remaining:', filtered.length);
-        return filtered;
-      });
-      
-      // Then delete from database
-      console.log('Attempting database delete...');
-      const { data, error } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('id', conversationToDelete)
-        .select();
-
-      console.log('Delete result:', { data, error });
-
-      if (error) {
-        // If error, restore the conversation
-        console.error('Error deleting conversation:', error);
-        Alert.alert('Erreur', `Impossible de supprimer la conversation: ${error.message}`);
-        loadConversations(); // Reload to restore
-      } else {
-        // Success - refresh unread count
-        console.log('Successfully deleted conversation');
-        refreshUnreadCount();
-      }
-    } catch (error) {
-      console.error('Exception deleting conversation:', error);
-      Alert.alert('Erreur', 'Impossible de supprimer la conversation');
-      loadConversations(); // Reload to restore
-    } finally {
-      setConversationToDelete(null);
-    }
-  };
-
-  const cancelDelete = () => {
-    setShowDeleteModal(false);
-    setConversationToDelete(null);
-  };
-
   const filteredConversations = conversations.filter((conv) => {
     if (!searchQuery) return true;
     const otherUser = getOtherUser(conv);
@@ -509,98 +447,7 @@ export default function MessagesScreen() {
     return userName.includes(query) || listingTitle.includes(query) || lastMessage.includes(query);
   });
 
-  const SwipeableConversation = ({ item }: { item: Conversation }) => {
-    const translateX = useRef(new Animated.Value(0)).current;
-    const [isSwiping, setIsSwiping] = useState(false);
-    const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const onSwipeLeft = () => {
-      Animated.timing(translateX, {
-        toValue: -100,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => setIsSwiping(true));
-    };
-
-    const onSwipeRight = () => {
-      Animated.timing(translateX, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => setIsSwiping(false));
-    };
-
-    const handlePressIn = () => {
-      if (!isSwiping) {
-        pressTimer.current = setTimeout(() => {
-          onSwipeLeft();
-        }, 500); // 500ms for long press
-      }
-    };
-
-    const handlePressOut = () => {
-      if (pressTimer.current) {
-        clearTimeout(pressTimer.current);
-        pressTimer.current = null;
-      }
-    };
-
-    const handlePress = () => {
-      if (isSwiping) {
-        onSwipeRight();
-      } else {
-        router.push(`/chat/${item.id}`);
-      }
-    };
-
-    return (
-      <View style={styles.swipeContainer}>
-        {/* Delete button (revealed on swipe) - only show when swiping */}
-        {isSwiping && (
-          <View 
-            style={styles.deleteButtonContainer}
-            onStartShouldSetResponder={() => true}
-            onTouchEnd={(e) => {
-              e.stopPropagation();
-            }}
-          >
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={(e) => {
-                e?.stopPropagation?.();
-                console.log('Delete button pressed for:', item.id);
-                deleteConversation(item.id);
-              }}
-              activeOpacity={0.7}
-            >
-              <Trash2 size={24} color="#fff" />
-              <Text style={styles.deleteButtonText}>Supprimer</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Conversation item */}
-        <Animated.View style={{ 
-          transform: [{ translateX }], 
-          backgroundColor: '#fff',
-          zIndex: isSwiping ? 0 : 2,
-        }}>
-          <TouchableOpacity
-            style={[styles.conversationItem, isSwiping && styles.conversationItemSwiped]}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            onPress={handlePress}
-            delayLongPress={500}
-            activeOpacity={0.7}
-          >
-            <ConversationContent item={item} />
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
-    );
-  };
-
-  const ConversationContent = ({ item }: { item: Conversation }) => {
+  const renderConversation = ({ item }: { item: Conversation }) => {
     const otherUser = getOtherUser(item);
     const listingImage = item.listing?.images?.[0];
     const profilePicture = otherUser?.profile_picture;
@@ -608,7 +455,11 @@ export default function MessagesScreen() {
     const hasUnread = unreadCount > 0;
 
     return (
-      <>
+      <TouchableOpacity
+        style={[styles.conversationItem, hasUnread && styles.conversationItemUnread]}
+        onPress={() => router.push(`/chat/${item.id}`)}
+        activeOpacity={0.7}
+      >
         {/* User Avatar with listing thumbnail */}
         <View style={styles.avatarContainer}>
           {profilePicture ? (
@@ -653,17 +504,13 @@ export default function MessagesScreen() {
             )}
           </View>
         </View>
-      </>
+      </TouchableOpacity>
     );
-  };
-
-  const renderConversation = ({ item }: { item: Conversation }) => {
-    return <SwipeableConversation item={item} />;
   };
 
   if (!user) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.container}>
           <View style={styles.header}>
             <Image
@@ -672,7 +519,9 @@ export default function MessagesScreen() {
               resizeMode="contain"
             />
             <View style={styles.headerIcons}>
-              <NotificationBell />
+              <TouchableOpacity style={styles.iconButton}>
+                <Bell size={24} color="#1e293b" strokeWidth={2} />
+              </TouchableOpacity>
             </View>
           </View>
           <View style={styles.emptyContainer}>
@@ -695,7 +544,7 @@ export default function MessagesScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.container}>
           <View style={styles.header}>
             <Image
@@ -704,11 +553,13 @@ export default function MessagesScreen() {
               resizeMode="contain"
             />
             <View style={styles.headerIcons}>
-              <NotificationBell />
+              <TouchableOpacity style={styles.iconButton}>
+                <Bell size={24} color="#1e293b" strokeWidth={2} />
+              </TouchableOpacity>
             </View>
           </View>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+            <ActivityIndicator size="large" color="#9bbd1f" />
           </View>
         </View>
       </SafeAreaView>
@@ -716,7 +567,7 @@ export default function MessagesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         {/* Modern Header */}
         <View style={styles.header}>
@@ -726,7 +577,9 @@ export default function MessagesScreen() {
             resizeMode="contain"
           />
           <View style={styles.headerIcons}>
-            <NotificationBell />
+            <TouchableOpacity style={styles.iconButton}>
+              <Bell size={24} color="#1e293b" strokeWidth={2} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -734,13 +587,13 @@ export default function MessagesScreen() {
         {/* 
         <TouchableOpacity
           style={{
-            backgroundColor: Colors.primary,
+            backgroundColor: '#9bbd1f',
             padding: 16,
             marginHorizontal: 16,
             marginTop: 8,
             borderRadius: 12,
             alignItems: 'center',
-            shadowColor: Colors.primary,
+            shadowColor: '#9bbd1f',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.3,
             shadowRadius: 4,
@@ -776,16 +629,6 @@ export default function MessagesScreen() {
           </View>
         </View>
 
-        {/* Safety Tip Banner */}
-        {conversations.length > 0 && (
-          <View style={styles.safetyTipBanner}>
-            <Text style={styles.safetyTipIcon}>🛡️</Text>
-            <Text style={styles.safetyTipText}>
-              <Text style={styles.safetyTipBold}>Rappel:</Text> Ne payez jamais avant d'avoir vu le produit en personne.
-            </Text>
-          </View>
-        )}
-
         {conversations.length === 0 ? (
           <View style={styles.emptyContainer}>
             <MessageCircle size={64} color="#cbd5e1" strokeWidth={1.5} />
@@ -804,37 +647,6 @@ export default function MessagesScreen() {
           />
         )}
       </View>
-
-      {/* Delete Confirmation Modal */}
-      <Modal
-        visible={showDeleteModal}
-        transparent
-        animationType="fade"
-        onRequestClose={cancelDelete}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.deleteModalContainer}>
-            <Text style={styles.deleteModalTitle}>Supprimer la conversation</Text>
-            <Text style={styles.deleteModalText}>
-              Êtes-vous sûr de vouloir supprimer cette conversation? Cette action est irréversible.
-            </Text>
-            <View style={styles.deleteModalButtons}>
-              <TouchableOpacity
-                style={styles.deleteModalCancelButton}
-                onPress={cancelDelete}
-              >
-                <Text style={styles.deleteModalCancelText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.deleteModalConfirmButton}
-                onPress={confirmDelete}
-              >
-                <Text style={styles.deleteModalConfirmText}>Supprimer</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -894,32 +706,6 @@ const styles = StyleSheet.create({
     color: '#000',
     padding: 0,
   },
-  safetyTipBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ecfdf5',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    gap: 10,
-  },
-  safetyTipIcon: {
-    fontSize: 18,
-  },
-  safetyTipText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#065f46',
-    lineHeight: 16,
-  },
-  safetyTipBold: {
-    fontWeight: '700',
-    color: '#064e3b',
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -945,7 +731,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   button: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#9bbd1f',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -957,36 +743,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   listContainer: {
-    paddingBottom: 120,
-  },
-  swipeContainer: {
-    position: 'relative',
-  },
-  deleteButtonContainer: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: 100,
-    backgroundColor: '#ef4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'column',
-    gap: 4,
-    zIndex: 10,
-  },
-  deleteButton: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ef4444',
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    paddingBottom: 100,
   },
   conversationItem: {
     flexDirection: 'row',
@@ -999,10 +756,7 @@ const styles = StyleSheet.create({
   conversationItemUnread: {
     backgroundColor: '#f0f8ff',
     borderLeftWidth: 4,
-    borderLeftColor: Colors.primary,
-  },
-  conversationItemSwiped: {
-    backgroundColor: '#fef2f2',
+    borderLeftColor: '#9bbd1f',
   },
   avatarContainer: {
     position: 'relative',
@@ -1018,7 +772,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#9bbd1f',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1125,64 +879,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  deleteModalContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  deleteModalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 12,
-  },
-  deleteModalText: {
-    fontSize: 16,
-    color: '#64748b',
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  deleteModalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  deleteModalCancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-  },
-  deleteModalCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  deleteModalConfirmButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#ef4444',
-    alignItems: 'center',
-  },
-  deleteModalConfirmText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
   },
 });

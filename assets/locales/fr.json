@@ -51,17 +51,57 @@
   "new_password": "Nouveau mot de passe",
   "minimum_6_characters": "Minimum 6 caractères",
   "confirm_password": "Confirmer le mot de passe",
-  "retype_password": "Retapez votre mot de passe",
-  "home": {
-    "location": "Localisation",
-    "currentLocation": "Position actuelle",
-    "within": "Dans un rayon de",
-    "allListings": "Toutes les annonces",
-    "searchRadius": "Rayon de recherche"
-  },
-  "listing": {
-    "location": "Localisation",
-    "awayFromYou": "de vous",
-    "approximateArea": "Zone approximative pour votre sécurité"
-  }
+  "retype_password": "Retapez votre mot de passe"
+  ,"cancel": "Annuler"
+  ,"tab_home": "Accueil"
+  ,"tab_messages": "Messages"
+  ,"tab_profile": "Profil"
+  ,"tab_post": "Publier"
+  ,"chat_risk_advance_payment": "Paiement en avance"
+  ,"chat_risk_money_transfer": "Transfert argent"
+  ,"chat_risk_gift_crypto": "Carte cadeau/Crypto"
+  ,"chat_risk_external_contact": "Contact externe risqué"
+  ,"chat_alert_risky_title": "⚠️ Message potentiellement risqué"
+  ,"chat_alert_risky_message": "Nous avons détecté: {{matches}}.\n\nNe partagez jamais vos codes OTP, mots de passe ou paiements en avance."
+  ,"chat_send_anyway": "Envoyer quand même"
+  ,"chat_report_details": "Signalé depuis la conversation {{id}}"
+  ,"chat_thanks": "Merci"
+  ,"chat_report_success": "Votre signalement a bien été envoyé à notre équipe."
+  ,"chat_report_failed": "Impossible d'envoyer le signalement."
+  ,"chat_report_user_title": "Signaler cet utilisateur"
+  ,"chat_report_user_subtitle": "Choisissez le motif principal du signalement"
+  ,"chat_report_reason_scam": "Tentative d'arnaque"
+  ,"chat_report_reason_spam": "Spam"
+  ,"chat_report_reason_harassment": "Harcèlement"
+  ,"chat_report_reason_other": "Autre"
+  ,"chat_block_title": "Bloquer cet utilisateur"
+  ,"chat_block_message": "Vous ne pourrez plus envoyer ni recevoir de messages dans cette conversation."
+  ,"chat_block_confirm": "Bloquer"
+  ,"chat_blocked_title": "Utilisateur bloqué"
+  ,"chat_blocked_message": "Le blocage est maintenant actif pour cette conversation."
+  ,"chat_block_failed": "Impossible de bloquer cet utilisateur."
+  ,"chat_conversation_blocked": "Conversation bloquée"
+  ,"chat_send_disabled_blocked": "L'envoi est désactivé car l'un des utilisateurs est bloqué."
+  ,"chat_too_many_messages_title": "Trop de messages"
+  ,"chat_too_many_messages_message": "Vous envoyez trop vite. Attendez quelques secondes avant de réessayer."
+  ,"chat_send_failed_blocked": "Impossible d'envoyer un message car un blocage est actif."
+  ,"chat_send_failed_generic": "Impossible d'envoyer le message. Réessayez."
+  ,"chat_today": "Aujourd'hui"
+  ,"chat_yesterday": "Hier"
+  ,"chat_blocked_banner": "Cette conversation est bloquée. L'envoi de nouveaux messages est désactivé."
+  ,"chat_write_message": "Écrire un message"
+  ,"settings_dark_mode_coming_soon": "Le mode sombre sera disponible dans une prochaine mise à jour"
+  ,"settings_change_mode_failed": "Impossible de changer le mode"
+  ,"settings_fill_all_fields": "Veuillez remplir tous les champs"
+  ,"settings_passwords_not_match": "Les mots de passe ne correspondent pas"
+  ,"settings_password_min_length": "Le mot de passe doit contenir au moins 6 caractères"
+  ,"settings_password_updated_success": "Mot de passe mis à jour avec succès"
+  ,"settings_change_password_failed": "Impossible de changer le mot de passe"
+  ,"settings_sign_out_title": "Se déconnecter"
+  ,"settings_sign_out_confirm": "Êtes-vous sûr de vouloir vous déconnecter ?"
+  ,"settings_delete_account_confirm": "Cette action est irréversible. Toutes vos données seront supprimées définitivement."
+  ,"settings_contact_support_delete": "Contactez le support pour supprimer votre compte."
+  ,"settings_thanks_title": "Merci!"
+  ,"settings_rate_app_message": "Nous apprécions votre soutien. Notez-nous sur l'App Store ou Google Play."
+  ,"settings_share_message": "Partagez Marché.cd avec vos amis!"
 }

@@ -3,11 +3,13 @@ import { View, StyleSheet, Text } from 'react-native';
 import { Home, Plus, User, MessageCircle } from 'lucide-react-native';
 import { useMessages } from '@/contexts/MessagesContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import Colors from '@/constants/Colors';
 
 export default function TabLayout() {
   const { unreadCount } = useMessages();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -26,7 +28,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Accueil',
+          title: t('tab_home'),
           tabBarIcon: ({ focused }) => (
             <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
               <Home color="#1e293b" size={24} strokeWidth={2} />
@@ -37,7 +39,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: 'Messages',
+          title: t('tab_messages'),
           tabBarIcon: ({ focused }) => (
             <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
               <MessageCircle color="#1e293b" size={24} strokeWidth={2} />
@@ -55,7 +57,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profil',
+          title: t('tab_profile'),
           tabBarIcon: ({ focused }) => (
             <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
               <User color="#1e293b" size={24} strokeWidth={2} />
@@ -66,7 +68,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="post"
         options={{
-          title: 'Publier',
+          title: t('tab_post'),
           tabBarIcon: ({ focused }) => (
             <View style={[styles.addButton, focused && styles.addButtonActive]}>
               <Plus color="#fff" size={28} strokeWidth={3} />

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,10 @@ import {
 } from 'lucide-react-native';
 import Colors from '../constants/Colors';
 import Typography from '../constants/Typography';
+import { useGuidance } from '../contexts/GuidanceContext';
+import { GuidedTour } from '../components/guidance/GuidedTour';
+import { Tooltip } from '../components/guidance/Tooltip';
+import { ContextualPrompt } from '../components/guidance/ContextualPrompt';
 
 const { width } = Dimensions.get('window');
 const isMobile = width < 768;
@@ -37,8 +41,27 @@ export default function LandingPage() {
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const downloadButtonRef = useRef<View>(null);
+
+  // Guidance state
+  const {
+    state: guidanceState,
+    shouldShowTour,
+    shouldShowTooltip,
+    markTourCompleted,
+    markTooltipDismissed,
+    markActionCompleted,
+    incrementScreenView,
+    getTooltipContent,
+  } = useGuidance();
+
+  const [showTour, setShowTour] = useState(false);
+  const [showDownloadTooltip, setShowDownloadTooltip] = useState(false);
+  const [showWebPrompt, setShowWebPrompt] = useState(false);
 
   useEffect(() => {
+    // Animate page entrance
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -51,16 +74,102 @@ export default function LandingPage() {
         useNativeDriver: true,
       }),
     ]).start();
+
+    // Track screen view
+    incrementScreenView('landing');
+
+    // Check if we should show the tour
+    const shouldShow = shouldShowTour('landing_tour');
+    if (shouldShow) {
+      // Delay tour slightly to let page load
+      setTimeout(() => {
+        setShowTour(true);
+      }, 1000);
+    } else {
+      // If tour already completed, show download tooltip after delay
+      setTimeout(() => {
+        if (shouldShowTooltip('landing_download')) {
+          setShowDownloadTooltip(true);
+          startPulseAnimation();
+        }
+      }, 2000);
+
+      // Show web-specific prompt if on web platform
+      if (Platform.OS === 'web') {
+        setTimeout(() => {
+          setShowWebPrompt(true);
+        }, 3000);
+      }
+    }
   }, []);
 
-  const handleDownloadAPK = () => {
+  // Pulse animation for download button
+  const startPulseAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  };
+
+  const handleTourComplete = async () => {
+    setShowTour(false);
+    await markTourCompleted('landing_tour');
+    await markActionCompleted('viewed_landing_tour');
+    
+    // Show download tooltip after tour
+    setTimeout(() => {
+      if (shouldShowTooltip('landing_download')) {
+        setShowDownloadTooltip(true);
+        startPulseAnimation();
+      }
+    }, 500);
+  };
+
+  const handleTourSkip = async () => {
+    setShowTour(false);
+    await markTourCompleted('landing_tour');
+  };
+
+  const handleTooltipDismiss = async () => {
+    setShowDownloadTooltip(false);
+    await markTooltipDismissed('landing_download');
+    pulseAnim.stopAnimation();
+    pulseAnim.setValue(1);
+  };
+
+  const handleDownloadAPK = async () => {
     const apkUrl = 'https://github.com/nganduntita1/marche.cd/releases/download/v1.0.0/marche-cd.apk';
     Linking.openURL(apkUrl);
+    
+    // Mark action as completed
+    await markActionCompleted('clicked_download');
+    
+    // Dismiss tooltip if showing
+    if (showDownloadTooltip) {
+      handleTooltipDismiss();
+    }
   };
 
   const handleWebLogin = () => {
     router.push('/auth/login');
   };
+
+  // Get tour and tooltip content
+  const landingTour = guidanceState?.settings.language 
+    ? require('../services/guidanceContent').GuidanceContentService.getTour('landing_tour', guidanceState.settings.language)
+    : null;
+
+  const downloadTooltip = getTooltipContent('landing_download');
 
   const features = [
     {
@@ -171,23 +280,30 @@ export default function LandingPage() {
 
           {/* Download Buttons */}
           <View style={styles.downloadSection}>
-            <TouchableOpacity
-              style={styles.downloadButton}
-              onPress={handleDownloadAPK}
-              activeOpacity={0.8}
+            <Animated.View
+              ref={downloadButtonRef}
+              style={{
+                transform: [{ scale: showDownloadTooltip ? pulseAnim : 1 }],
+              }}
             >
-              <View style={styles.downloadButtonIcon}>
-                <Image 
-                  source={require('../assets/images/android.png')} 
-                  style={styles.platformIcon}
-                  resizeMode="contain"
-                />
-              </View>
-              <View style={styles.downloadButtonText}>
-                <Text style={styles.downloadButtonLabel}>Télécharger pour</Text>
-                <Text style={styles.downloadButtonTitle}>Android</Text>
-              </View>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.downloadButton}
+                onPress={handleDownloadAPK}
+                activeOpacity={0.8}
+              >
+                <View style={styles.downloadButtonIcon}>
+                  <Image 
+                    source={require('../assets/images/android.png')} 
+                    style={styles.platformIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View style={styles.downloadButtonText}>
+                  <Text style={styles.downloadButtonLabel}>Télécharger pour</Text>
+                  <Text style={styles.downloadButtonTitle}>Android</Text>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
 
             <View style={styles.comingSoonButton}>
               <View style={styles.downloadButtonIcon}>
@@ -360,6 +476,50 @@ export default function LandingPage() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Guidance Components */}
+      {landingTour && (
+        <GuidedTour
+          tour={landingTour}
+          visible={showTour}
+          onComplete={handleTourComplete}
+          onSkip={handleTourSkip}
+        />
+      )}
+
+      {downloadTooltip && (
+        <Tooltip
+          content={downloadTooltip}
+          targetRef={downloadButtonRef}
+          visible={showDownloadTooltip}
+          onDismiss={handleTooltipDismiss}
+          onAction={handleDownloadAPK}
+        />
+      )}
+
+      {Platform.OS === 'web' && (
+        <ContextualPrompt
+          message={
+            guidanceState?.settings.language === 'fr'
+              ? "Pour la meilleure expérience, téléchargez notre application mobile. Elle est rapide, facile et fonctionne hors ligne !"
+              : "For the best experience, download our mobile app. It's fast, easy, and works offline!"
+          }
+          actions={[
+            {
+              label: guidanceState?.settings.language === 'fr' ? 'Télécharger' : 'Download',
+              onPress: handleDownloadAPK,
+              primary: true,
+            },
+            {
+              label: guidanceState?.settings.language === 'fr' ? 'Continuer sur le web' : 'Continue on Web',
+              onPress: handleWebLogin,
+            },
+          ]}
+          visible={showWebPrompt}
+          onDismiss={() => setShowWebPrompt(false)}
+          icon="phone-portrait-outline"
+        />
+      )}
     </ScrollView>
   );
 }

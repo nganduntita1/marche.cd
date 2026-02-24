@@ -24,6 +24,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import Colors from '@/constants/Colors';
+import { SellerDashboardGuidance } from '@/components/guidance';
 
 interface DashboardStats {
   totalListings: number;
@@ -60,6 +61,12 @@ export default function SellerDashboard() {
     totalEarnings: 0,
   });
   const [topListings, setTopListings] = useState<TopListing[]>([]);
+  const [lowViewListings, setLowViewListings] = useState<Array<{
+    id: string;
+    title: string;
+    views: number;
+    daysActive: number;
+  }>>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -72,7 +79,7 @@ export default function SellerDashboard() {
       // Load listings stats
       const { data: listings, error: listingsError } = await supabase
         .from('listings')
-        .select('id, status, is_promoted, views_count')
+        .select('id, title, status, is_promoted, views_count')
         .eq('seller_id', user.id);
 
       if (listingsError) throw listingsError;
@@ -132,6 +139,18 @@ export default function SellerDashboard() {
           favorites: (l.listing_stats as any)?.[0]?.total_favorites || 0,
         })) || []
       );
+
+      // Identify low-view listings (less than 10 views after being active)
+      const lowViews = listings
+        ?.filter(l => l.status === 'active' && (l.views_count || 0) < 10)
+        .map(l => ({
+          id: l.id,
+          title: l.title || '',
+          views: l.views_count || 0,
+          daysActive: 1, // Simplified - would calculate from created_at in real implementation
+        })) || [];
+      
+      setLowViewListings(lowViews);
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
@@ -180,6 +199,26 @@ export default function SellerDashboard() {
           />
         }
       >
+        {/* Seller Dashboard Guidance */}
+        <View style={styles.section}>
+          <SellerDashboardGuidance
+            totalListings={stats.totalListings}
+            activeListings={stats.activeListings}
+            lowViewListings={lowViewListings}
+            onPromotePress={(listingId) => {
+              // Navigate to promote modal or screen
+              router.push(`/listing/${listingId}`);
+            }}
+            onEditPress={(listingId) => {
+              router.push(`/edit-listing/${listingId}`);
+            }}
+            onMarkAsSoldPress={(listingId) => {
+              // Handle mark as sold
+              router.push(`/listing/${listingId}`);
+            }}
+          />
+        </View>
+
         {/* Overview Stats */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Vue d'ensemble</Text>

@@ -17,8 +17,10 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, X } from 'lucide-react-native';
+import { Camera, X, HelpCircle } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
+import { useGuidance } from '@/contexts/GuidanceContext';
+import { Tooltip, ProfilePhotoTips } from '@/components/guidance';
 
 export default function EditProfileScreen() {
   const [name, setName] = useState('');
@@ -27,8 +29,11 @@ export default function EditProfileScreen() {
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPhotoTips, setShowPhotoTips] = useState(false);
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const router = useRouter();
   const { user, loadUserProfile } = useAuth();
+  const { shouldShowTooltip, markTooltipDismissed, getTooltipContent } = useGuidance();
 
   useEffect(() => {
     if (user) {
@@ -222,6 +227,13 @@ export default function EditProfileScreen() {
             <Text style={styles.pictureHint}>
               {profilePicture ? 'Appuyez pour changer' : 'Ajoutez une photo de profil'}
             </Text>
+            <TouchableOpacity
+              style={styles.photoTipsButton}
+              onPress={() => setShowPhotoTips(true)}
+            >
+              <HelpCircle size={16} color={Colors.primary} />
+              <Text style={styles.photoTipsText}>Conseils pour une bonne photo</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.formCard}>
@@ -236,7 +248,15 @@ export default function EditProfileScreen() {
             )}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nom complet *</Text>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Nom complet *</Text>
+                <TouchableOpacity
+                  onPress={() => setActiveTooltip('edit_profile_name')}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <HelpCircle size={16} color="#64748b" />
+                </TouchableOpacity>
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder="Votre nom"
@@ -247,7 +267,15 @@ export default function EditProfileScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Numéro de téléphone</Text>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Numéro de téléphone</Text>
+                <TouchableOpacity
+                  onPress={() => setActiveTooltip('edit_profile_phone')}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <HelpCircle size={16} color="#64748b" />
+                </TouchableOpacity>
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder="+243..."
@@ -262,7 +290,15 @@ export default function EditProfileScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Ville</Text>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Ville</Text>
+                <TouchableOpacity
+                  onPress={() => setActiveTooltip('edit_profile_location')}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <HelpCircle size={16} color="#64748b" />
+                </TouchableOpacity>
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder="Kinshasa, Lubumbashi, etc."
@@ -291,6 +327,58 @@ export default function EditProfileScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Profile Photo Tips Modal */}
+      <ProfilePhotoTips
+        visible={showPhotoTips}
+        onDismiss={() => setShowPhotoTips(false)}
+      />
+
+      {/* Field Tooltips */}
+      {activeTooltip === 'edit_profile_name' && (
+        <Tooltip
+          content={{
+            id: 'edit_profile_name',
+            title: 'Votre nom',
+            message: 'Utilisez votre vrai nom pour inspirer confiance. Les acheteurs et vendeurs préfèrent savoir avec qui ils traitent.',
+            placement: 'bottom',
+            icon: '👤',
+            dismissLabel: 'Compris',
+          }}
+          visible={true}
+          onDismiss={() => setActiveTooltip(null)}
+        />
+      )}
+
+      {activeTooltip === 'edit_profile_phone' && (
+        <Tooltip
+          content={{
+            id: 'edit_profile_phone',
+            title: 'Numéro de téléphone',
+            message: 'Votre numéro est essentiel pour que les acheteurs puissent vous contacter. Assurez-vous qu\'il est correct et actif.',
+            placement: 'bottom',
+            icon: '📞',
+            dismissLabel: 'Compris',
+          }}
+          visible={true}
+          onDismiss={() => setActiveTooltip(null)}
+        />
+      )}
+
+      {activeTooltip === 'edit_profile_location' && (
+        <Tooltip
+          content={{
+            id: 'edit_profile_location',
+            title: 'Votre ville',
+            message: 'Indiquer votre ville aide les acheteurs à trouver des articles près d\'eux et facilite les rencontres.',
+            placement: 'bottom',
+            icon: '📍',
+            dismissLabel: 'Compris',
+          }}
+          visible={true}
+          onDismiss={() => setActiveTooltip(null)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -403,6 +491,24 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textAlign: 'center',
   },
+  photoTipsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  photoTipsText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
   formCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -416,10 +522,15 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 20,
   },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   label: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 8,
     color: '#1e293b',
   },
   input: {

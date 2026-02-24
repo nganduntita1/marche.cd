@@ -22,12 +22,12 @@ export default function Popup({ visible, title, message, buttonText, onClose, on
 
   const getButtonColors = () => {
     if (title.toLowerCase().includes('crédit') || title.toLowerCase().includes('épuisé')) {
-      return [Colors.primary, '#7da01a'];
+      return [Colors.primary, '#7da01a'] as const;
     }
     if (title.toLowerCase().includes('erreur')) {
-      return ['#ef4444', '#dc2626'];
+      return ['#ef4444', '#dc2626'] as const;
     }
-    return [Colors.primary, '#7da01a'];
+    return [Colors.primary, '#7da01a'] as const;
   };
 
   return (
