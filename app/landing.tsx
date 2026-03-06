@@ -33,12 +33,16 @@ import { useGuidance } from '../contexts/GuidanceContext';
 import { GuidedTour } from '../components/guidance/GuidedTour';
 import { Tooltip } from '../components/guidance/Tooltip';
 import { ContextualPrompt } from '../components/guidance/ContextualPrompt';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 const isMobile = width < 768;
 
 export default function LandingPage() {
   const router = useRouter();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -174,54 +178,54 @@ export default function LandingPage() {
   const features = [
     {
       icon: MapPin,
-      title: 'Basé sur la localisation',
-      description: 'Trouvez des articles près de chez vous avec un filtrage intelligent',
+      title: txt('Basé sur la localisation', 'Location-based'),
+      description: txt('Trouvez des articles près de chez vous avec un filtrage intelligent', 'Find items near you with smart filtering'),
       color: Colors.primary,
     },
     {
       icon: Shield,
-      title: 'Sûr et sécurisé',
-      description: 'Conseils de sécurité intégrés et messagerie sécurisée',
+      title: txt('Sûr et sécurisé', 'Safe and secure'),
+      description: txt('Conseils de sécurité intégrés et messagerie sécurisée', 'Built-in safety tips and secure messaging'),
       color: '#3b82f6',
     },
     {
       icon: Zap,
-      title: 'Actions rapides',
-      description: 'Promouvoir, partager et marquer les articles vendus instantanément',
+      title: txt('Actions rapides', 'Quick actions'),
+      description: txt('Promouvoir, partager et marquer les articles vendus instantanément', 'Promote, share, and mark items as sold instantly'),
       color: '#f59e0b',
     },
     {
       icon: Users,
-      title: 'Notes et avis',
-      description: 'Établissez la confiance avec les évaluations des acheteurs et vendeurs',
+      title: txt('Notes et avis', 'Ratings and reviews'),
+      description: txt('Établissez la confiance avec les évaluations des acheteurs et vendeurs', 'Build trust with buyer and seller ratings'),
       color: '#8b5cf6',
     },
   ];
 
   const stats = [
-    { icon: Users, value: '10K+', label: 'Utilisateurs actifs' },
-    { icon: TrendingUp, value: '50K+', label: 'Articles listés' },
-    { icon: MessageCircle, value: '100K+', label: 'Messages envoyés' },
-    { icon: Award, value: '4.8', label: 'Note de l\'app' },
+    { icon: Users, value: '10K+', label: txt('Utilisateurs actifs', 'Active users') },
+    { icon: TrendingUp, value: '50K+', label: txt('Articles listés', 'Items listed') },
+    { icon: MessageCircle, value: '100K+', label: txt('Messages envoyés', 'Messages sent') },
+    { icon: Award, value: '4.8', label: txt('Note de l\'app', 'App rating') },
   ];
 
   const testimonials = [
     {
       name: 'Marie K.',
       location: 'Kinshasa',
-      text: 'J\'ai vendu mon téléphone en moins de 24h! Interface simple et acheteurs sérieux.',
+      text: txt('J\'ai vendu mon téléphone en moins de 24h! Interface simple et acheteurs sérieux.', 'I sold my phone in under 24h! Simple interface and serious buyers.'),
       rating: 5,
     },
     {
       name: 'Jean-Paul M.',
       location: 'Lubumbashi',
-      text: 'Meilleure app pour acheter et vendre au Congo. Très sécurisée!',
+      text: txt('Meilleure app pour acheter et vendre au Congo. Très sécurisée!', 'Best app to buy and sell in Congo. Very secure!'),
       rating: 5,
     },
     {
       name: 'Sarah N.',
       location: 'Goma',
-      text: 'Je trouve toujours ce que je cherche près de chez moi. Excellent!',
+      text: txt('Je trouve toujours ce que je cherche près de chez moi. Excellent!', 'I always find what I need near me. Excellent!'),
       rating: 5,
     },
   ];
@@ -247,7 +251,7 @@ export default function LandingPage() {
             <View style={styles.floatingBadge2}>
               <View style={styles.badge}>
                 <Users size={16} color={Colors.primary} />
-                <Text style={styles.badgeText}>10K+ Utilisateurs</Text>
+                <Text style={styles.badgeText}>{txt('10K+ Utilisateurs', '10K+ Users')}</Text>
               </View>
             </View>
           </>
@@ -272,10 +276,10 @@ export default function LandingPage() {
             )}
           </View>
           <Text style={styles.heroSubtitle}>
-            Achetez et vendez tout, partout au Congo
+            {txt('Achetez et vendez tout, partout au Congo', 'Buy and sell anything, anywhere in Congo')}
           </Text>
           <Text style={styles.heroDescription}>
-            Le moyen le plus simple de découvrir de bonnes affaires et de vendre des articles dans votre communauté locale
+            {txt('Le moyen le plus simple de découvrir de bonnes affaires et de vendre des articles dans votre communauté locale', 'The easiest way to discover great deals and sell items in your local community')}
           </Text>
 
           {/* Download Buttons */}
@@ -299,7 +303,7 @@ export default function LandingPage() {
                   />
                 </View>
                 <View style={styles.downloadButtonText}>
-                  <Text style={styles.downloadButtonLabel}>Télécharger pour</Text>
+                  <Text style={styles.downloadButtonLabel}>{txt('Télécharger pour', 'Download for')}</Text>
                   <Text style={styles.downloadButtonTitle}>Android</Text>
                 </View>
               </TouchableOpacity>
@@ -314,7 +318,7 @@ export default function LandingPage() {
                 />
               </View>
               <View style={styles.downloadButtonText}>
-                <Text style={styles.comingSoonLabel}>Bientôt disponible</Text>
+                <Text style={styles.comingSoonLabel}>{txt('Bientôt disponible', 'Coming soon')}</Text>
                 <Text style={styles.comingSoonTitle}>iOS</Text>
               </View>
             </View>
@@ -327,7 +331,7 @@ export default function LandingPage() {
             activeOpacity={0.8}
           >
             <Globe size={20} color={Colors.white} />
-            <Text style={styles.webLoginText}>Utiliser la version web</Text>
+            <Text style={styles.webLoginText}>{txt('Utiliser la version web', 'Use web version')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </LinearGradient>
@@ -347,9 +351,9 @@ export default function LandingPage() {
 
       {/* Features Section */}
       <View style={styles.featuresSection}>
-        <Text style={styles.sectionTitle}>Pourquoi choisir Marché.cd?</Text>
+        <Text style={styles.sectionTitle}>{txt('Pourquoi choisir Marché.cd?', 'Why choose Marché.cd?')}</Text>
         <Text style={styles.sectionSubtitle}>
-          Tout ce dont vous avez besoin pour une expérience d'achat et de vente fluide
+          {txt("Tout ce dont vous avez besoin pour une expérience d'achat et de vente fluide", 'Everything you need for a smooth buying and selling experience')}
         </Text>
         <View style={styles.featuresGrid}>
           {features.map((feature, index) => (
@@ -369,9 +373,9 @@ export default function LandingPage() {
 
       {/* Testimonials Section */}
       <View style={styles.testimonialsSection}>
-        <Text style={styles.sectionTitle}>Ce que disent nos utilisateurs</Text>
+        <Text style={styles.sectionTitle}>{txt('Ce que disent nos utilisateurs', 'What our users say')}</Text>
         <Text style={styles.sectionSubtitle}>
-          Rejoignez des milliers d'acheteurs et de vendeurs satisfaits
+          {txt("Rejoignez des milliers d'acheteurs et de vendeurs satisfaits", 'Join thousands of satisfied buyers and sellers')}
         </Text>
         <ScrollView 
           horizontal 
@@ -405,15 +409,15 @@ export default function LandingPage() {
 
       {/* How It Works Section */}
       <View style={styles.howItWorksSection}>
-        <Text style={styles.sectionTitle}>Comment ça marche</Text>
+        <Text style={styles.sectionTitle}>{txt('Comment ça marche', 'How it works')}</Text>
         <View style={styles.stepsContainer}>
           <View style={styles.step}>
             <View style={styles.stepNumber}>
               <Text style={styles.stepNumberText}>1</Text>
             </View>
-            <Text style={styles.stepTitle}>Téléchargez et inscrivez-vous</Text>
+            <Text style={styles.stepTitle}>{txt('Téléchargez et inscrivez-vous', 'Download and sign up')}</Text>
             <Text style={styles.stepDescription}>
-              Obtenez l'application et créez votre compte en quelques secondes
+              {txt("Obtenez l'application et créez votre compte en quelques secondes", 'Get the app and create your account in seconds')}
             </Text>
           </View>
 
@@ -421,9 +425,9 @@ export default function LandingPage() {
             <View style={styles.stepNumber}>
               <Text style={styles.stepNumberText}>2</Text>
             </View>
-            <Text style={styles.stepTitle}>Parcourez ou publiez</Text>
+            <Text style={styles.stepTitle}>{txt('Parcourez ou publiez', 'Browse or post')}</Text>
             <Text style={styles.stepDescription}>
-              Trouvez de bonnes affaires ou listez vos articles à vendre
+              {txt('Trouvez de bonnes affaires ou listez vos articles à vendre', 'Find great deals or list items for sale')}
             </Text>
           </View>
 
@@ -431,9 +435,9 @@ export default function LandingPage() {
             <View style={styles.stepNumber}>
               <Text style={styles.stepNumberText}>3</Text>
             </View>
-            <Text style={styles.stepTitle}>Connectez et échangez</Text>
+            <Text style={styles.stepTitle}>{txt('Connectez et échangez', 'Connect and trade')}</Text>
             <Text style={styles.stepDescription}>
-              Discutez avec les acheteurs/vendeurs et finalisez votre transaction
+              {txt('Discutez avec les acheteurs/vendeurs et finalisez votre transaction', 'Chat with buyers/sellers and complete your transaction')}
             </Text>
           </View>
         </View>
@@ -446,33 +450,33 @@ export default function LandingPage() {
         end={{ x: 1, y: 1 }}
         style={styles.ctaSection}
       >
-        <Text style={styles.ctaTitle}>Prêt à commencer?</Text>
+        <Text style={styles.ctaTitle}>{txt('Prêt à commencer?', 'Ready to get started?')}</Text>
         <Text style={styles.ctaDescription}>
-          Rejoignez des milliers d'utilisateurs qui achètent et vendent sur Marché.cd
+          {txt("Rejoignez des milliers d'utilisateurs qui achètent et vendent sur Marché.cd", 'Join thousands of users buying and selling on Marché.cd')}
         </Text>
         <TouchableOpacity
           style={styles.ctaButton}
           onPress={handleDownloadAPK}
           activeOpacity={0.8}
         >
-          <Text style={styles.ctaButtonText}>Télécharger maintenant</Text>
+          <Text style={styles.ctaButtonText}>{txt('Télécharger maintenant', 'Download now')}</Text>
         </TouchableOpacity>
       </LinearGradient>
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>© 2024 Marché.cd. Tous droits réservés.</Text>
+        <Text style={styles.footerText}>{txt('© 2024 Marché.cd. Tous droits réservés.', '© 2024 Marché.cd. All rights reserved.')}</Text>
         <View style={styles.footerLinks}>
           <TouchableOpacity onPress={() => router.push('/privacy')}>
-            <Text style={styles.footerLink}>Politique de confidentialité</Text>
+            <Text style={styles.footerLink}>{txt('Politique de confidentialité', 'Privacy Policy')}</Text>
           </TouchableOpacity>
           <Text style={styles.footerDivider}>•</Text>
           <TouchableOpacity onPress={() => router.push('/terms')}>
-            <Text style={styles.footerLink}>Conditions d'utilisation</Text>
+            <Text style={styles.footerLink}>{txt("Conditions d'utilisation", 'Terms of Use')}</Text>
           </TouchableOpacity>
           <Text style={styles.footerDivider}>•</Text>
           <TouchableOpacity onPress={() => router.push('/help-center')}>
-            <Text style={styles.footerLink}>Centre d'aide</Text>
+            <Text style={styles.footerLink}>{txt("Centre d'aide", 'Help Center')}</Text>
           </TouchableOpacity>
         </View>
       </View>

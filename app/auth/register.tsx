@@ -21,6 +21,7 @@ import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
 import { GuidedTour } from '@/components/guidance/GuidedTour';
 import { Tooltip } from '@/components/guidance/Tooltip';
+import { useTranslation } from 'react-i18next';
 
 export default function RegisterScreen() {
   const [firstName, setFirstName] = useState('');
@@ -37,6 +38,9 @@ export default function RegisterScreen() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { signUp } = useAuth();
   const router = useRouter();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   
   // Guidance state
   const guidance = useGuidance();
@@ -149,28 +153,28 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!firstName || !lastName || !phone || !location || !password || !confirmPassword) {
-      setError('Veuillez remplir tous les champs obligatoires');
+      setError(txt('Veuillez remplir tous les champs obligatoires', 'Please fill in all required fields'));
       return;
     }
 
     if (!agreedToTerms) {
-      setError('Veuillez accepter les Conditions d\'utilisation et la Politique de confidentialité');
+      setError(txt('Veuillez accepter les Conditions d\'utilisation et la Politique de confidentialité', 'Please accept the Terms of Use and Privacy Policy'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas');
+      setError(txt('Les mots de passe ne correspondent pas', 'Passwords do not match'));
       return;
     }
 
     if (password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères');
+      setError(txt('Le mot de passe doit contenir au moins 6 caractères', 'Password must be at least 6 characters'));
       return;
     }
 
     // Validate phone number format
     if (!phone.startsWith('+243') && !phone.startsWith('0')) {
-      setError('Le numéro de téléphone doit commencer par +243 ou 0');
+      setError(txt('Le numéro de téléphone doit commencer par +243 ou 0', 'Phone number must start with +243 or 0'));
       return;
     }
 
@@ -189,7 +193,7 @@ export default function RegisterScreen() {
       
       router.replace('/(tabs)');
     } catch (err: any) {
-      setError(err.message || 'Erreur lors de la création du compte');
+      setError(err.message || txt('Erreur lors de la création du compte', 'Error creating account'));
     } finally {
       setLoading(false);
     }
@@ -224,10 +228,10 @@ export default function RegisterScreen() {
                 resizeMode="contain" 
               />
               <View style={styles.welcomeContainer}>
-                <Text style={styles.welcomeText}>Rejoignez</Text>
+                <Text style={styles.welcomeText}>{txt('Rejoignez', 'Join')}</Text>
               </View>
               <Text style={styles.subtitle}>
-                Créez votre compte et commencez à acheter et vendre au Congo
+                {txt('Créez votre compte et commencez à acheter et vendre au Congo', 'Create your account and start buying and selling in the Congo')}
               </Text>
             </LinearGradient>
           </LinearGradient>
@@ -240,11 +244,11 @@ export default function RegisterScreen() {
             ) : null}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Prénom</Text>
+              <Text style={styles.label}>{txt('Prénom', 'First name')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Votre prénom"
+                  placeholder={txt('Votre prénom', 'Your first name')}
                   placeholderTextColor="#94a3b8"
                   value={firstName}
                   onChangeText={setFirstName}
@@ -256,11 +260,11 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nom de famille</Text>
+              <Text style={styles.label}>{txt('Nom de famille', 'Last name')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Votre nom de famille"
+                  placeholder={txt('Votre nom de famille', 'Your last name')}
                   placeholderTextColor="#94a3b8"
                   value={lastName}
                   onChangeText={setLastName}
@@ -272,7 +276,7 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email (optionnel)</Text>
+              <Text style={styles.label}>{txt('Email (optionnel)', 'Email (optional)')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -290,16 +294,16 @@ export default function RegisterScreen() {
                 </View>
               </View>
               <Text style={styles.hint}>
-                Si vide, nous créerons un email automatiquement
+                {txt('Si vide, nous créerons un email automatiquement', 'If empty, we will create an email automatically')}
               </Text>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Numéro de téléphone *</Text>
+              <Text style={styles.label}>{txt('Numéro de téléphone *', 'Phone number *')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="+243 ou 0..."
+                  placeholder={txt('+243 ou 0...', '+243 or 0...')}
                   placeholderTextColor="#94a3b8"
                   value={phone}
                   onChangeText={setPhone}
@@ -314,7 +318,7 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Ville *</Text>
+              <Text style={styles.label}>{txt('Ville *', 'City *')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -332,7 +336,7 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Mot de passe</Text>
+              <Text style={styles.label}>{txt('Mot de passe', 'Password')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -358,7 +362,7 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Confirmer le mot de passe</Text>
+              <Text style={styles.label}>{txt('Confirmer le mot de passe', 'Confirm password')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -394,9 +398,11 @@ export default function RegisterScreen() {
                 )}
               </View>
               <Text style={styles.checkboxText}>
-                J'accepte les{' '}
-                <Text style={styles.checkboxLink}>Conditions d'utilisation</Text> et la{' '}
-                <Text style={styles.checkboxLink}>Politique de confidentialité</Text> de Marche CD.
+                {txt("J'accepte les ", 'I accept the ')}
+                <Text style={styles.checkboxLink}>{txt("Conditions d'utilisation", 'Terms of Use')}</Text>
+                {txt(' et la ', ' and the ')}
+                <Text style={styles.checkboxLink}>{txt('Politique de confidentialité', 'Privacy Policy')}</Text>
+                {txt(' de Marche CD.', ' of Marché.cd.')}
               </Text>
             </TouchableOpacity>
 
@@ -406,7 +412,7 @@ export default function RegisterScreen() {
               disabled={loading}
             >
               <Text style={styles.buttonText}>
-                {loading ? 'Création...' : 'Créer mon compte'}
+                {loading ? txt('Création...', 'Creating...') : txt('Créer mon compte', 'Create my account')}
               </Text>
             </TouchableOpacity>
 
@@ -415,7 +421,8 @@ export default function RegisterScreen() {
               onPress={() => router.push('/auth/login')}
             >
               <Text style={styles.linkText}>
-                Déjà un compte ? <Text style={styles.linkBold}>Se connecter</Text>
+                {txt('Déjà un compte ? ', 'Already have an account? ')}
+                <Text style={styles.linkBold}>{txt('Se connecter', 'Sign in')}</Text>
               </Text>
             </TouchableOpacity>
           </View>

@@ -17,6 +17,7 @@ import { Mail, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
+import { useTranslation } from 'react-i18next';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -26,10 +27,13 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const { signIn } = useAuth();
   const router = useRouter();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setError('Veuillez remplir tous les champs');
+      setError(txt('Veuillez remplir tous les champs', 'Please fill in all fields'));
       return;
     }
 
@@ -40,7 +44,7 @@ export default function LoginScreen() {
       await signIn(email, password);
       router.replace('/(tabs)');
     } catch (err: any) {
-      setError(err.message || 'Erreur de connexion');
+      setError(err.message || txt('Erreur de connexion', 'Login error'));
     } finally {
       setLoading(false);
     }
@@ -75,10 +79,10 @@ export default function LoginScreen() {
                 resizeMode="contain" 
               />
               <View style={styles.welcomeContainer}>
-                <Text style={styles.welcomeText}>Bienvenue sur</Text>
+                <Text style={styles.welcomeText}>{txt('Bienvenue sur', 'Welcome to')}</Text>
               </View>
               <Text style={styles.subtitle}>
-                Votre marketplace local pour acheter et vendre au Congo
+                {txt('Votre marketplace local pour acheter et vendre au Congo', 'Your local marketplace to buy and sell in the Congo')}
               </Text>
             </LinearGradient>
           </LinearGradient>
@@ -91,7 +95,7 @@ export default function LoginScreen() {
             ) : null}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Adresse Email</Text>
+              <Text style={styles.label}>{txt('Adresse Email', 'Email Address')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -109,7 +113,7 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Mot de passe</Text>
+              <Text style={styles.label}>{txt('Mot de passe', 'Password')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -138,7 +142,7 @@ export default function LoginScreen() {
               disabled={loading}
             >
               <Text style={styles.buttonText}>
-                {loading ? 'Connexion...' : 'Se connecter'}
+                {loading ? txt('Connexion...', 'Signing in...') : txt('Se connecter', 'Sign in')}
               </Text>
             </TouchableOpacity>
 
@@ -147,7 +151,8 @@ export default function LoginScreen() {
               onPress={() => router.push('/auth/register')}
             >
               <Text style={styles.linkText}>
-                Pas de compte ? <Text style={styles.linkBold}>Créer un compte</Text>
+                {txt('Pas de compte ? ', "Don't have an account? ")}
+                <Text style={styles.linkBold}>{txt('Créer un compte', 'Create an account')}</Text>
               </Text>
             </TouchableOpacity>
           </View>

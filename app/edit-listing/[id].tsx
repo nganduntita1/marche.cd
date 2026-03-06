@@ -20,11 +20,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Camera, FileText, Tag, DollarSign, X, Check } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
+import { useTranslation } from 'react-i18next';
 
 export default function EditListingScreen() {
   const { id } = useLocalSearchParams();
   const { user } = useAuth();
   const router = useRouter();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
@@ -35,15 +39,15 @@ export default function EditListingScreen() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const categories = [
-    { label: 'Téléphones', value: 'telephones' },
-    { label: 'Véhicules', value: 'vehicules' },
-    { label: 'Électronique', value: 'electronique' },
-    { label: 'Maison & Jardin', value: 'maison-jardin' },
-    { label: 'Mode & Beauté', value: 'mode-beaute' },
-    { label: 'Emplois', value: 'emplois' },
-    { label: 'Services', value: 'services' },
-    { label: 'Immobilier', value: 'immobilier' },
-    { label: 'Autre', value: 'autre' },
+    { label: txt('Téléphones', 'Phones'), value: 'telephones' },
+    { label: txt('Véhicules', 'Vehicles'), value: 'vehicules' },
+    { label: txt('Électronique', 'Electronics'), value: 'electronique' },
+    { label: txt('Maison & Jardin', 'Home & Garden'), value: 'maison-jardin' },
+    { label: txt('Mode & Beauté', 'Fashion & Beauty'), value: 'mode-beaute' },
+    { label: txt('Emplois', 'Jobs'), value: 'emplois' },
+    { label: txt('Services', 'Services'), value: 'services' },
+    { label: txt('Immobilier', 'Real estate'), value: 'immobilier' },
+    { label: txt('Autre', 'Other'), value: 'autre' },
   ];
 
   useEffect(() => {
@@ -66,7 +70,7 @@ export default function EditListingScreen() {
 
       // Check if user owns this listing
       if (data.seller_id !== user?.id) {
-        Alert.alert('Erreur', 'Vous ne pouvez pas modifier cette annonce');
+        Alert.alert(txt('Erreur', 'Error'), txt('Vous ne pouvez pas modifier cette annonce', 'You cannot edit this listing'));
         router.back();
         return;
       }
@@ -78,7 +82,7 @@ export default function EditListingScreen() {
       setImages(data.images || []);
     } catch (error) {
       console.error('Error loading listing:', error);
-      Alert.alert('Erreur', 'Impossible de charger l\'annonce');
+      Alert.alert(txt('Erreur', 'Error'), txt('Impossible de charger l\'annonce', 'Unable to load listing'));
       router.back();
     } finally {
       setLoading(false);
@@ -87,13 +91,13 @@ export default function EditListingScreen() {
 
   const pickImages = async () => {
     if (images.length >= 5) {
-      Alert.alert('Maximum 5 images', 'Vous ne pouvez pas ajouter plus de 5 images.');
+      Alert.alert(txt('Maximum 5 images', 'Maximum 5 images'), txt('Vous ne pouvez pas ajouter plus de 5 images.', 'You cannot add more than 5 images.'));
       return;
     }
 
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission refusée', 'Accès à la bibliothèque de photos requis.');
+      Alert.alert(txt('Permission refusée', 'Permission denied'), txt('Accès à la bibliothèque de photos requis.', 'Photo library access is required.'));
       return;
     }
 
@@ -119,7 +123,7 @@ export default function EditListingScreen() {
 
   const handleSubmit = async () => {
     if (!title || !category || !description || !price || images.length === 0) {
-      Alert.alert('Erreur', 'Tous les champs et au moins une image sont requis.');
+      Alert.alert(txt('Erreur', 'Error'), txt('Tous les champs et au moins une image sont requis.', 'All fields and at least one image are required.'));
       return;
     }
 
@@ -132,8 +136,8 @@ export default function EditListingScreen() {
         .select('id')
         .eq('slug', category)
         .single();
-      if (catErr) throw new Error(`Erreur catégorie: ${catErr.message}`);
-      if (!catData) throw new Error('Catégorie introuvable');
+      if (catErr) throw new Error(`${txt('Erreur catégorie', 'Category error')}: ${catErr.message}`);
+      if (!catData) throw new Error(txt('Catégorie introuvable', 'Category not found'));
 
       // Upload new images (those that are local URIs)
       const imageUrls = await Promise.all(
@@ -181,7 +185,7 @@ export default function EditListingScreen() {
             return urlData.publicUrl;
           } catch (error: any) {
             console.error(`Image ${idx + 1} upload error:`, error);
-            throw new Error(`Échec du téléchargement de l'image ${idx + 1}: ${error.message}`);
+            throw new Error(`${txt("Échec du téléchargement de l'image", 'Image upload failed')} ${idx + 1}: ${error.message}`);
           }
         })
       );
@@ -198,9 +202,9 @@ export default function EditListingScreen() {
         })
         .eq('id', id);
 
-      if (updateErr) throw new Error(`Erreur de mise à jour: ${updateErr.message}`);
+      if (updateErr) throw new Error(`${txt('Erreur de mise à jour', 'Update error')}: ${updateErr.message}`);
 
-      Alert.alert('Succès', 'Annonce mise à jour', [
+      Alert.alert(txt('Succès', 'Success'), txt('Annonce mise à jour', 'Listing updated'), [
         {
           text: 'OK',
           onPress: () => router.push(`/listing/${id}`),
@@ -208,7 +212,7 @@ export default function EditListingScreen() {
       ]);
     } catch (err: any) {
       console.error('Submit error:', err);
-      Alert.alert('Erreur', err.message ?? 'Mise à jour échouée.');
+      Alert.alert(txt('Erreur', 'Error'), err.message ?? txt('Mise à jour échouée.', 'Update failed.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -220,7 +224,7 @@ export default function EditListingScreen() {
         <View style={styles.container}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.loadingText}>Chargement...</Text>
+            <Text style={styles.loadingText}>{txt('Chargement...', 'Loading...')}</Text>
           </View>
         </View>
       </SafeAreaView>
@@ -245,16 +249,16 @@ export default function EditListingScreen() {
         </View>
         
         <View style={styles.formCard}>
-          <Text style={styles.pageTitle}>Modifier l'annonce</Text>
-          <Text style={styles.pageSubtitle}>Mettez à jour les informations de votre article</Text>
+          <Text style={styles.pageTitle}>{txt("Modifier l'annonce", 'Edit listing')}</Text>
+          <Text style={styles.pageSubtitle}>{txt('Mettez à jour les informations de votre article', 'Update your item information')}</Text>
 
           {/* Images */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Camera size={18} color={Colors.primary} />
-              <Text style={styles.label}>Images (max 5) *</Text>
+              <Text style={styles.label}>{txt('Images (max 5) *', 'Images (max 5) *')}</Text>
             </View>
-            <Text style={styles.labelHint}>Ajoutez des photos de qualité pour attirer plus d'acheteurs</Text>
+            <Text style={styles.labelHint}>{txt("Ajoutez des photos de qualité pour attirer plus d'acheteurs", 'Add quality photos to attract more buyers')}</Text>
             <View style={styles.imageList}>
               {images.map((uri, i) => (
                 <View key={i} style={styles.imageContainer}>
@@ -276,7 +280,7 @@ export default function EditListingScreen() {
                     style={styles.addImageGradient}
                   >
                     <Text style={styles.addImageIcon}>📷</Text>
-                    <Text style={styles.addImageText}>Ajouter</Text>
+                    <Text style={styles.addImageText}>{txt('Ajouter', 'Add')}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
@@ -287,14 +291,14 @@ export default function EditListingScreen() {
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <FileText size={18} color={Colors.primary} />
-              <Text style={styles.label}>Titre *</Text>
+              <Text style={styles.label}>{txt('Titre *', 'Title *')}</Text>
             </View>
             <View style={styles.inputContainer}>
               <TextInput 
                 style={styles.input} 
                 value={title} 
                 onChangeText={setTitle} 
-                placeholder="ex: iPhone 11 Pro Max 256GB" 
+                placeholder={txt('ex: iPhone 11 Pro Max 256GB', 'e.g. iPhone 11 Pro Max 256GB')}
                 placeholderTextColor="#94a3b8"
                 maxLength={100} 
               />
@@ -306,12 +310,12 @@ export default function EditListingScreen() {
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Tag size={18} color={Colors.primary} />
-              <Text style={styles.label}>Catégorie *</Text>
+              <Text style={styles.label}>{txt('Catégorie *', 'Category *')}</Text>
             </View>
             <TouchableOpacity style={styles.selectContainer} onPress={() => setShowCategoryModal(true)}>
               <View style={styles.selectContent}>
                 <Text style={[styles.selectText, !category && styles.selectPlaceholder]}>
-                  {category ? categories.find(c => c.value === category)?.label : 'Sélectionner une catégorie'}
+                  {category ? categories.find(c => c.value === category)?.label : txt('Sélectionner une catégorie', 'Select a category')}
                 </Text>
                 <Text style={styles.selectArrow}>▼</Text>
               </View>
@@ -322,15 +326,15 @@ export default function EditListingScreen() {
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <FileText size={18} color={Colors.primary} />
-              <Text style={styles.label}>Description *</Text>
+              <Text style={styles.label}>{txt('Description *', 'Description *')}</Text>
             </View>
-            <Text style={styles.labelHint}>Décrivez l'état, les caractéristiques et les détails importants</Text>
+            <Text style={styles.labelHint}>{txt("Décrivez l'état, les caractéristiques et les détails importants", 'Describe condition, features, and important details')}</Text>
             <View style={styles.inputContainer}>
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={description}
                 onChangeText={setDescription}
-                placeholder="Décrivez votre article en détail..."
+                placeholder={txt('Décrivez votre article en détail...', 'Describe your item in detail...')}
                 placeholderTextColor="#94a3b8"
                 multiline
                 numberOfLines={4}
@@ -345,7 +349,7 @@ export default function EditListingScreen() {
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <DollarSign size={18} color={Colors.primary} />
-              <Text style={styles.label}>Prix (USD) *</Text>
+              <Text style={styles.label}>{txt('Prix (USD) *', 'Price (USD) *')}</Text>
             </View>
             <View style={styles.inputContainer}>
               <TextInput 
@@ -377,7 +381,7 @@ export default function EditListingScreen() {
               style={styles.submitButtonGradient}
             >
               <Text style={styles.submitButtonText}>
-                {isSubmitting ? '⏳ Mise à jour en cours...' : "✓ Enregistrer les modifications"}
+                {isSubmitting ? txt('⏳ Mise à jour en cours...', '⏳ Updating...') : txt('✓ Enregistrer les modifications', '✓ Save changes')}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -399,8 +403,8 @@ export default function EditListingScreen() {
                 <View style={styles.modalHeaderText}>
                   <Tag size={24} color={Colors.primary} />
                   <View style={styles.modalTitleContainer}>
-                    <Text style={styles.modalTitle}>Choisir une catégorie</Text>
-                    <Text style={styles.modalSubtitle}>Sélectionnez la catégorie qui correspond le mieux</Text>
+                    <Text style={styles.modalTitle}>{txt('Choisir une catégorie', 'Choose a category')}</Text>
+                    <Text style={styles.modalSubtitle}>{txt('Sélectionnez la catégorie qui correspond le mieux', 'Select the category that fits best')}</Text>
                   </View>
                 </View>
                 <TouchableOpacity style={styles.modalCloseButton} onPress={() => setShowCategoryModal(false)}>

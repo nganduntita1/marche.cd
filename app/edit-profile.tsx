@@ -21,6 +21,7 @@ import { Camera, X, HelpCircle } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
 import { useGuidance } from '@/contexts/GuidanceContext';
 import { Tooltip, ProfilePhotoTips } from '@/components/guidance';
+import { useTranslation } from 'react-i18next';
 
 export default function EditProfileScreen() {
   const [name, setName] = useState('');
@@ -33,6 +34,9 @@ export default function EditProfileScreen() {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const router = useRouter();
   const { user, loadUserProfile } = useAuth();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const { shouldShowTooltip, markTooltipDismissed, getTooltipContent } = useGuidance();
 
   useEffect(() => {
@@ -48,7 +52,7 @@ export default function EditProfileScreen() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (status !== 'granted') {
-      Alert.alert('Permission requise', 'Nous avons besoin de votre permission pour accéder à vos photos.');
+      Alert.alert(txt('Permission requise', 'Permission required'), txt('Nous avons besoin de votre permission pour accéder à vos photos.', 'We need your permission to access your photos.'));
       return;
     }
 
@@ -95,8 +99,8 @@ export default function EditProfileScreen() {
         console.error('Storage upload error:', error);
         if (error.message.includes('Bucket not found')) {
           Alert.alert(
-            'Configuration requise',
-            'Le stockage des photos de profil n\'est pas encore configuré. Veuillez contacter l\'administrateur.'
+            txt('Configuration requise', 'Setup required'),
+            txt('Le stockage des photos de profil n\'est pas encore configuré. Veuillez contacter l\'administrateur.', 'Profile photo storage is not configured yet. Please contact the administrator.')
           );
         } else {
           throw error;
@@ -113,8 +117,8 @@ export default function EditProfileScreen() {
     } catch (error: any) {
       console.error('Error uploading image:', error);
       Alert.alert(
-        'Erreur',
-        error.message || 'Impossible de télécharger l\'image. Veuillez réessayer.'
+        txt('Erreur', 'Error'),
+        error.message || txt('Impossible de télécharger l\'image. Veuillez réessayer.', 'Unable to upload the image. Please try again.')
       );
     } finally {
       setUploading(false);
@@ -123,12 +127,12 @@ export default function EditProfileScreen() {
 
   const removeProfilePicture = () => {
     Alert.alert(
-      'Supprimer la photo',
-      'Êtes-vous sûr de vouloir supprimer votre photo de profil ?',
+      txt('Supprimer la photo', 'Remove photo'),
+      txt('Êtes-vous sûr de vouloir supprimer votre photo de profil ?', 'Are you sure you want to remove your profile photo?'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: txt('Annuler', 'Cancel'), style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: txt('Supprimer', 'Remove'),
           style: 'destructive',
           onPress: () => setProfilePicture(null),
         },
@@ -138,12 +142,12 @@ export default function EditProfileScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Erreur', 'Le nom est requis');
+      Alert.alert(txt('Erreur', 'Error'), txt('Le nom est requis', 'Name is required'));
       return;
     }
 
     if (!user?.id) {
-      Alert.alert('Erreur', 'Veuillez vous connecter');
+      Alert.alert(txt('Erreur', 'Error'), txt('Veuillez vous connecter', 'Please sign in'));
       router.replace('/auth/login');
       return;
     }
@@ -164,10 +168,10 @@ export default function EditProfileScreen() {
       if (error) throw error;
 
       await loadUserProfile(user.id);
-      Alert.alert('Succès', 'Profil mis à jour avec succès');
+      Alert.alert(txt('Succès', 'Success'), txt('Profil mis à jour avec succès', 'Profile updated successfully'));
       router.back();
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Erreur lors de la mise à jour du profil');
+      Alert.alert(txt('Erreur', 'Error'), error.message || txt('Erreur lors de la mise à jour du profil', 'Error updating profile'));
     } finally {
       setLoading(false);
     }
@@ -183,7 +187,7 @@ export default function EditProfileScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Modifier le profil</Text>
+          <Text style={styles.headerTitle}>{txt('Modifier le profil', 'Edit profile')}</Text>
           <View style={styles.placeholder} />
         </View>
 
@@ -225,14 +229,14 @@ export default function EditProfileScreen() {
             </View>
             
             <Text style={styles.pictureHint}>
-              {profilePicture ? 'Appuyez pour changer' : 'Ajoutez une photo de profil'}
+              {profilePicture ? txt('Appuyez pour changer', 'Tap to change') : txt('Ajoutez une photo de profil', 'Add a profile photo')}
             </Text>
             <TouchableOpacity
               style={styles.photoTipsButton}
               onPress={() => setShowPhotoTips(true)}
             >
               <HelpCircle size={16} color={Colors.primary} />
-              <Text style={styles.photoTipsText}>Conseils pour une bonne photo</Text>
+              <Text style={styles.photoTipsText}>{txt('Conseils pour une bonne photo', 'Tips for a good photo')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -242,14 +246,14 @@ export default function EditProfileScreen() {
                 <Text style={styles.generatedEmailLabel}>Email de connexion généré</Text>
                 <Text style={styles.generatedEmailValue}>{user.email}</Text>
                 <Text style={styles.generatedEmailHint}>
-                  Cet email a été créé automatiquement pour votre compte
+                  {txt('Cet email a été créé automatiquement pour votre compte', 'This email was generated automatically for your account')}
                 </Text>
               </View>
             )}
 
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Nom complet *</Text>
+                <Text style={styles.label}>{txt('Nom complet *', 'Full name *')}</Text>
                 <TouchableOpacity
                   onPress={() => setActiveTooltip('edit_profile_name')}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -259,7 +263,7 @@ export default function EditProfileScreen() {
               </View>
               <TextInput
                 style={styles.input}
-                placeholder="Votre nom"
+                placeholder={txt('Votre nom', 'Your name')}
                 value={name}
                 onChangeText={setName}
                 placeholderTextColor="#94a3b8"
@@ -268,7 +272,7 @@ export default function EditProfileScreen() {
 
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Numéro de téléphone</Text>
+                <Text style={styles.label}>{txt('Numéro de téléphone', 'Phone number')}</Text>
                 <TouchableOpacity
                   onPress={() => setActiveTooltip('edit_profile_phone')}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -285,13 +289,13 @@ export default function EditProfileScreen() {
                 placeholderTextColor="#94a3b8"
               />
               <Text style={styles.hint}>
-                Utilisé pour la connexion et les contacts
+                {txt('Utilisé pour la connexion et les contacts', 'Used for sign in and contacts')}
               </Text>
             </View>
 
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Ville</Text>
+                <Text style={styles.label}>{txt('Ville', 'City')}</Text>
                 <TouchableOpacity
                   onPress={() => setActiveTooltip('edit_profile_location')}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -314,7 +318,7 @@ export default function EditProfileScreen() {
               disabled={loading}
             >
               <Text style={styles.saveButtonText}>
-                {loading ? 'Enregistrement...' : 'Enregistrer'}
+                {loading ? txt('Enregistrement...', 'Saving...') : txt('Enregistrer', 'Save')}
               </Text>
             </TouchableOpacity>
 
@@ -322,7 +326,7 @@ export default function EditProfileScreen() {
               style={styles.cancelButton}
               onPress={() => router.back()}
             >
-              <Text style={styles.cancelButtonText}>Annuler</Text>
+              <Text style={styles.cancelButtonText}>{txt('Annuler', 'Cancel')}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

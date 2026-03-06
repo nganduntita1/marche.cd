@@ -18,10 +18,14 @@ import { FavoritesGuidance } from '@/components/guidance';
 import { ListingWithDetails } from '@/types/database';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
+import { useTranslation } from 'react-i18next';
 
 export default function FavoritesScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const { state, shouldShowTooltip, incrementScreenView } = useGuidance();
   const [favorites, setFavorites] = useState<ListingWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +116,7 @@ export default function FavoritesScreen() {
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
               <ArrowLeft size={24} color="#1e293b" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Mes Favoris</Text>
+            <Text style={styles.headerTitle}>{txt('Mes Favoris', 'My Favorites')}</Text>
             <View style={styles.placeholder} />
           </View>
           <View style={styles.loadingContainer}>
@@ -130,7 +134,7 @@ export default function FavoritesScreen() {
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <ArrowLeft size={24} color="#1e293b" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Mes Favoris</Text>
+          <Text style={styles.headerTitle}>{txt('Mes Favoris', 'My Favorites')}</Text>
           <View style={styles.placeholder} />
         </View>
 
@@ -139,15 +143,15 @@ export default function FavoritesScreen() {
             <View style={styles.emptyStateIcon}>
               <Package size={48} color="#cbd5e1" />
             </View>
-            <Text style={styles.emptyStateTitle}>Aucun favori</Text>
+            <Text style={styles.emptyStateTitle}>{txt('Aucun favori', 'No favorites')}</Text>
             <Text style={styles.emptyStateText}>
-              Les annonces que vous ajoutez à vos favoris apparaîtront ici
+              {txt('Les annonces que vous ajoutez à vos favoris apparaîtront ici', 'Listings you add to favorites will appear here')}
             </Text>
             <TouchableOpacity 
               style={styles.browseButton}
               onPress={() => router.back()}
             >
-              <Text style={styles.browseButtonText}>Parcourir les annonces</Text>
+              <Text style={styles.browseButtonText}>{txt('Parcourir les annonces', 'Browse listings')}</Text>
             </TouchableOpacity>
           </View>
         ) : (

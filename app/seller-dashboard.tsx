@@ -25,6 +25,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import Colors from '@/constants/Colors';
 import { SellerDashboardGuidance } from '@/components/guidance';
+import { useTranslation } from 'react-i18next';
 
 interface DashboardStats {
   totalListings: number;
@@ -48,6 +49,9 @@ interface TopListing {
 export default function SellerDashboard() {
   const router = useRouter();
   const { user } = useAuth();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
@@ -184,7 +188,7 @@ export default function SellerDashboard() {
         >
           <ArrowLeft size={24} color="#1e293b" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tableau de bord</Text>
+        <Text style={styles.headerTitle}>{txt('Tableau de bord', 'Dashboard')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -221,25 +225,25 @@ export default function SellerDashboard() {
 
         {/* Overview Stats */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vue d'ensemble</Text>
+          <Text style={styles.sectionTitle}>{txt("Vue d'ensemble", 'Overview')}</Text>
           
           <View style={styles.statsGrid}>
             <View style={[styles.statCard, styles.statCardPrimary]}>
               <Package size={24} color={Colors.primary} />
               <Text style={styles.statValue}>{stats.totalListings}</Text>
-              <Text style={styles.statLabel}>Annonces totales</Text>
+              <Text style={styles.statLabel}>{txt('Annonces totales', 'Total listings')}</Text>
             </View>
 
             <View style={styles.statCard}>
               <Sparkles size={24} color="#22c55e" />
               <Text style={styles.statValue}>{stats.activeListings}</Text>
-              <Text style={styles.statLabel}>Actives</Text>
+              <Text style={styles.statLabel}>{txt('Actives', 'Active')}</Text>
             </View>
 
             <View style={styles.statCard}>
               <Eye size={24} color="#3b82f6" />
               <Text style={styles.statValue}>{stats.totalViews}</Text>
-              <Text style={styles.statLabel}>Vues totales</Text>
+              <Text style={styles.statLabel}>{txt('Vues totales', 'Total views')}</Text>
             </View>
 
             <View style={styles.statCard}>
@@ -251,13 +255,13 @@ export default function SellerDashboard() {
             <View style={styles.statCard}>
               <Heart size={24} color="#ef4444" />
               <Text style={styles.statValue}>{stats.totalFavorites}</Text>
-              <Text style={styles.statLabel}>Favoris</Text>
+              <Text style={styles.statLabel}>{txt('Favoris', 'Favorites')}</Text>
             </View>
 
             <View style={styles.statCard}>
               <TrendingUp size={24} color="#f59e0b" />
               <Text style={styles.statValue}>{stats.soldListings}</Text>
-              <Text style={styles.statLabel}>Vendues</Text>
+              <Text style={styles.statLabel}>{txt('Vendues', 'Sold')}</Text>
             </View>
           </View>
         </View>
@@ -267,12 +271,14 @@ export default function SellerDashboard() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Sparkles size={20} color={Colors.primary} />
-              <Text style={styles.sectionTitle}>Annonces promues</Text>
+              <Text style={styles.sectionTitle}>{txt('Annonces promues', 'Promoted listings')}</Text>
             </View>
             <View style={styles.promotedCard}>
               <Text style={styles.promotedValue}>{stats.promotedListings}</Text>
               <Text style={styles.promotedLabel}>
-                annonce{stats.promotedListings > 1 ? 's' : ''} actuellement promue{stats.promotedListings > 1 ? 's' : ''}
+                {isFrench
+                  ? `annonce${stats.promotedListings > 1 ? 's' : ''} actuellement promue${stats.promotedListings > 1 ? 's' : ''}`
+                  : `listing${stats.promotedListings > 1 ? 's' : ''} currently promoted`}
               </Text>
             </View>
           </View>
@@ -282,7 +288,7 @@ export default function SellerDashboard() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             {/* <BarChart3 size={20} color="#1e293b" /> */}
-            <Text style={styles.sectionTitle}>Meilleures annonces</Text>
+            <Text style={styles.sectionTitle}>{txt('Meilleures annonces', 'Top listings')}</Text>
           </View>
 
           {topListings.length > 0 ? (
@@ -319,7 +325,7 @@ export default function SellerDashboard() {
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>
-                Aucune donnée disponible pour le moment
+                {txt('Aucune donnée disponible pour le moment', 'No data available at the moment')}
               </Text>
             </View>
           )}
@@ -327,14 +333,14 @@ export default function SellerDashboard() {
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Actions rapides</Text>
+          <Text style={styles.sectionTitle}>{txt('Actions rapides', 'Quick actions')}</Text>
           
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => router.push('/post')}
           >
             <Package size={20} color={Colors.primary} />
-            <Text style={styles.actionButtonText}>Créer une annonce</Text>
+            <Text style={styles.actionButtonText}>{txt('Créer une annonce', 'Create listing')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -342,7 +348,7 @@ export default function SellerDashboard() {
             onPress={() => router.push('/profile')}
           >
             <Eye size={20} color={Colors.primary} />
-            <Text style={styles.actionButtonText}>Voir mes annonces</Text>
+            <Text style={styles.actionButtonText}>{txt('Voir mes annonces', 'View my listings')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -350,7 +356,7 @@ export default function SellerDashboard() {
             onPress={() => router.push('/messages')}
           >
             <MessageCircle size={20} color={Colors.primary} />
-            <Text style={styles.actionButtonText}>Mes messages</Text>
+            <Text style={styles.actionButtonText}>{txt('Mes messages', 'My messages')}</Text>
           </TouchableOpacity>
         </View>
 

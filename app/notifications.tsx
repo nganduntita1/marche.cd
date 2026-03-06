@@ -18,6 +18,7 @@ import { useGuidance } from '@/contexts/GuidanceContext';
 import Colors from '@/constants/Colors';
 import RatingModal from '@/components/RatingModal';
 import { NotificationsGuidance } from '@/components/guidance';
+import { useTranslation } from 'react-i18next';
 
 interface Notification {
   id: string;
@@ -33,6 +34,9 @@ interface Notification {
 export default function NotificationsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const { state, shouldShowTooltip, shouldShowTour, incrementScreenView } = useGuidance();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,8 +158,8 @@ export default function NotificationsScreen() {
       if (existingReview) {
         // User has already rated - show message
         Alert.alert(
-          'Déjà évalué',
-          'Vous avez déjà soumis votre évaluation pour cette transaction.',
+          txt('Déjà évalué', 'Already rated'),
+          txt('Vous avez déjà soumis votre évaluation pour cette transaction.', 'You have already submitted your rating for this transaction.'),
           [{ text: 'OK' }]
         );
         return;
@@ -189,8 +193,8 @@ export default function NotificationsScreen() {
         const isUserSeller = transaction.seller_id === user?.id;
         const revieweeId = isUserSeller ? transaction.buyer_id : transaction.seller_id;
         const revieweeName = isUserSeller 
-          ? (transaction.buyer as any)?.name || 'Acheteur'
-          : (transaction.seller as any)?.name || 'Vendeur';
+          ? (transaction.buyer as any)?.name || txt('Acheteur', 'Buyer')
+          : (transaction.seller as any)?.name || txt('Vendeur', 'Seller');
 
         setSelectedRating({
           transactionId: transaction.id,
@@ -239,11 +243,13 @@ export default function NotificationsScreen() {
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
     if (diffInHours < 1) {
-      return 'Il y a quelques minutes';
+      return txt('Il y a quelques minutes', 'A few minutes ago');
     } else if (diffInHours < 24) {
-      return `Il y a ${Math.floor(diffInHours)} heure${Math.floor(diffInHours) > 1 ? 's' : ''}`;
+      return isFrench
+        ? `Il y a ${Math.floor(diffInHours)} heure${Math.floor(diffInHours) > 1 ? 's' : ''}`
+        : `${Math.floor(diffInHours)} hour${Math.floor(diffInHours) > 1 ? 's' : ''} ago`;
     } else {
-      return date.toLocaleDateString('fr-FR', {
+      return date.toLocaleDateString(isFrench ? 'fr-FR' : 'en-US', {
         day: 'numeric',
         month: 'short',
         hour: '2-digit',
@@ -272,10 +278,10 @@ export default function NotificationsScreen() {
         >
           <ArrowLeft size={24} color="#1e293b" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <Text style={styles.headerTitle}>{txt('Notifications', 'Notifications')}</Text>
         {notifications.some(n => !n.read) && (
           <TouchableOpacity onPress={markAllAsRead}>
-            <Text style={styles.markAllRead}>Tout marquer lu</Text>
+            <Text style={styles.markAllRead}>{txt('Tout marquer lu', 'Mark all as read')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -294,9 +300,9 @@ export default function NotificationsScreen() {
         {notifications.length === 0 ? (
           <View style={styles.emptyState}>
             <Bell size={64} color="#cbd5e1" />
-            <Text style={styles.emptyStateTitle}>Aucune notification</Text>
+            <Text style={styles.emptyStateTitle}>{txt('Aucune notification', 'No notifications')}</Text>
             <Text style={styles.emptyStateText}>
-              Vous recevrez des notifications ici quand quelqu'un interagit avec vos annonces
+              {txt("Vous recevrez des notifications ici quand quelqu'un interagit avec vos annonces", 'You will receive notifications here when someone interacts with your listings')}
             </Text>
           </View>
         ) : (
@@ -328,7 +334,7 @@ export default function NotificationsScreen() {
                   </Text>
                   {notification.alreadyRated && (
                     <Text style={styles.completedText}>
-                      ✓ Évaluation soumise
+                      {txt('✓ Évaluation soumise', '✓ Rating submitted')}
                     </Text>
                   )}
                   <Text style={styles.notificationDate}>

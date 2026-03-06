@@ -21,11 +21,15 @@ import { Camera, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/Colors';
 import { ListingWithDetails, ListingCondition, Category } from '@/types/database';
+import { useTranslation } from 'react-i18next';
 
 export default function EditListingScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -74,7 +78,7 @@ export default function EditListingScreen() {
       if (error) throw error;
 
       if (data.seller_id !== user?.id) {
-        Alert.alert('Erreur', 'Vous n\'avez pas la permission de modifier cette annonce.');
+        Alert.alert(txt('Erreur', 'Error'), txt('Vous n\'avez pas la permission de modifier cette annonce.', 'You do not have permission to edit this listing.'));
         router.back();
         return;
       }
@@ -91,7 +95,7 @@ export default function EditListingScreen() {
       });
     } catch (error) {
       console.error('Error loading listing:', error);
-      Alert.alert('Erreur', 'Impossible de charger l\'annonce.');
+      Alert.alert(txt('Erreur', 'Error'), txt('Impossible de charger l\'annonce.', 'Unable to load listing.'));
       router.back();
     } finally {
       setLoading(false);
@@ -100,12 +104,12 @@ export default function EditListingScreen() {
 
   const handleSubmit = async () => {
     if (!formData.title || !formData.price || !formData.category_id || !formData.condition || !formData.location) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires.');
+      Alert.alert(txt('Erreur', 'Error'), txt('Veuillez remplir tous les champs obligatoires.', 'Please fill in all required fields.'));
       return;
     }
 
     if (formData.images.length === 0) {
-      Alert.alert('Erreur', 'Veuillez ajouter au moins une image.');
+      Alert.alert(txt('Erreur', 'Error'), txt('Veuillez ajouter au moins une image.', 'Please add at least one image.'));
       return;
     }
 
@@ -131,7 +135,7 @@ export default function EditListingScreen() {
       router.back();
     } catch (error) {
       console.error('Error updating listing:', error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour l\'annonce.');
+      Alert.alert(txt('Erreur', 'Error'), txt('Impossible de mettre à jour l\'annonce.', 'Unable to update listing.'));
     } finally {
       setSaving(false);
     }
@@ -141,7 +145,7 @@ export default function EditListingScreen() {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text>Chargement des détails de l'annonce...</Text>
+        <Text>{txt("Chargement des détails de l'annonce...", 'Loading listing details...')}</Text>
       </SafeAreaView>
     );
   }
@@ -150,7 +154,7 @@ export default function EditListingScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text>Annonce non trouvée.</Text>
+          <Text>{txt('Annonce non trouvée.', 'Listing not found.')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -164,36 +168,36 @@ export default function EditListingScreen() {
       >
         <ScrollView>
           <View style={styles.form}>
-            <Text style={styles.label}>Titre *</Text>
+            <Text style={styles.label}>{txt('Titre *', 'Title *')}</Text>
             <TextInput
               style={styles.input}
               value={formData.title}
               onChangeText={(text) => setFormData({ ...formData, title: text })}
-              placeholder="Titre de l'annonce"
+              placeholder={txt("Titre de l'annonce", 'Listing title')}
             />
 
-            <Text style={styles.label}>Description</Text>
+            <Text style={styles.label}>{txt('Description', 'Description')}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={formData.description}
               onChangeText={(text) => setFormData({ ...formData, description: text })}
-              placeholder="Description détaillée de l'article"
+              placeholder={txt("Description détaillée de l'article", 'Detailed item description')}
               multiline
               numberOfLines={4}
             />
 
-            <Text style={styles.label}>Prix *</Text>
+            <Text style={styles.label}>{txt('Prix *', 'Price *')}</Text>
             <TextInput
               style={styles.input}
               value={formData.price}
               onChangeText={(text) =>
                 setFormData({ ...formData, price: text.replace(/[^0-9]/g, '') })
               }
-              placeholder="Prix en USD"
+              placeholder={txt('Prix en USD', 'Price in USD')}
               keyboardType="numeric"
             />
 
-            <Text style={styles.label}>Catégorie *</Text>
+            <Text style={styles.label}>{txt('Catégorie *', 'Category *')}</Text>
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={formData.category_id}
@@ -202,7 +206,7 @@ export default function EditListingScreen() {
                 }
                 style={styles.picker}
               >
-                <Picker.Item label="Sélectionner une catégorie" value="" />
+                <Picker.Item label={txt('Sélectionner une catégorie', 'Select a category')} value="" />
                 {categories.map((category) => (
                   <Picker.Item
                     key={category.id}
@@ -213,7 +217,7 @@ export default function EditListingScreen() {
               </Picker>
             </View>
 
-            <Text style={styles.label}>État *</Text>
+            <Text style={styles.label}>{txt('État *', 'Condition *')}</Text>
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={formData.condition}
@@ -222,23 +226,23 @@ export default function EditListingScreen() {
                 }
                 style={styles.picker}
               >
-                <Picker.Item label="Sélectionner l'état" value="" />
-                <Picker.Item label="Neuf" value="new" />
-                <Picker.Item label="Comme neuf" value="like_new" />
-                <Picker.Item label="Bon état" value="good" />
-                <Picker.Item label="État moyen" value="fair" />
-                <Picker.Item label="À rénover" value="poor" />
+                <Picker.Item label={txt("Sélectionner l'état", 'Select condition')} value="" />
+                <Picker.Item label={txt('Neuf', 'New')} value="new" />
+                <Picker.Item label={txt('Comme neuf', 'Like new')} value="like_new" />
+                <Picker.Item label={txt('Bon état', 'Good')} value="good" />
+                <Picker.Item label={txt('État moyen', 'Fair')} value="fair" />
+                <Picker.Item label={txt('À rénover', 'Needs repair')} value="poor" />
               </Picker>
             </View>
 
-            <Text style={styles.label}>Localisation *</Text>
+            <Text style={styles.label}>{txt('Localisation *', 'Location *')}</Text>
             <TextInput
               style={styles.input}
               value={formData.location}
               onChangeText={(text) =>
                 setFormData({ ...formData, location: text })
               }
-              placeholder="Ex: Kinshasa, Gombe"
+              placeholder={txt('Ex: Kinshasa, Gombe', 'e.g. Kinshasa, Gombe')}
             />
 
             <TouchableOpacity
@@ -253,7 +257,7 @@ export default function EditListingScreen() {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.submitButtonText}>
-                  Enregistrer les modifications
+                  {txt('Enregistrer les modifications', 'Save changes')}
                 </Text>
               )}
             </TouchableOpacity>

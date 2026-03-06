@@ -28,10 +28,19 @@ import CityPickerModal from '@/components/CityPickerModal';
 import NotificationBell from '@/components/NotificationBell';
 import { useGuidance } from '@/contexts/GuidanceContext';
 import { Tooltip, PostingGuidance } from '@/components/guidance';
+import { useTranslation } from 'react-i18next';
+
+type PickedImageMeta = {
+  fileName?: string | null;
+  mimeType?: string | null;
+};
 
 export default function PostScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const { userLocation, currentCity } = useLocation();
   const { shouldShowTooltip, markTooltipDismissed, markActionCompleted, incrementScreenView, getTooltipContent } = useGuidance();
   
@@ -40,6 +49,7 @@ export default function PostScreen() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [imageMetaMap, setImageMetaMap] = useState<Record<string, PickedImageMeta>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
@@ -70,30 +80,31 @@ export default function PostScreen() {
     setDescription('');
     setPrice('');
     setImages([]);
+    setImageMetaMap({});
     setNewListingId(null);
   };
 
   const categories = [
-    { label: 'Téléphones', value: 'telephones' },
-    { label: 'Véhicules', value: 'vehicules' },
-    { label: 'Électronique', value: 'electronique' },
-    { label: 'Maison & Jardin', value: 'maison-jardin' },
-    { label: 'Mode & Beauté', value: 'mode-beaute' },
-    { label: 'Emplois', value: 'emplois' },
-    { label: 'Services', value: 'services' },
-    { label: 'Immobilier', value: 'immobilier' },
-    { label: 'Autre', value: 'autre' },
+    { label: txt('Téléphones', 'Phones'), value: 'telephones' },
+    { label: txt('Véhicules', 'Vehicles'), value: 'vehicules' },
+    { label: txt('Électronique', 'Electronics'), value: 'electronique' },
+    { label: txt('Maison & Jardin', 'Home & Garden'), value: 'maison-jardin' },
+    { label: txt('Mode & Beauté', 'Fashion & Beauty'), value: 'mode-beaute' },
+    { label: txt('Emplois', 'Jobs'), value: 'emplois' },
+    { label: txt('Services', 'Services'), value: 'services' },
+    { label: txt('Immobilier', 'Real estate'), value: 'immobilier' },
+    { label: txt('Autre', 'Other'), value: 'autre' },
   ];
 
   const pickImages = async () => {
     if (images.length >= 5) {
-      Alert.alert('Maximum 5 images', 'Vous ne pouvez pas ajouter plus de 5 images.');
+      Alert.alert(txt('Maximum 5 images', 'Maximum 5 images'), txt('Vous ne pouvez pas ajouter plus de 5 images.', 'You cannot add more than 5 images.'));
       return;
     }
 
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission refusée', 'Accès à la bibliothèque de photos requis.');
+      Alert.alert(txt('Permission refusée', 'Permission denied'), txt('Accès à la bibliothèque de photos requis.', 'Photo library access is required.'));
       return;
     }
 
@@ -104,12 +115,30 @@ export default function PostScreen() {
     });
 
     if (!result.canceled && result.assets?.[0]?.uri) {
-      setImages(prev => [...prev, result.assets[0].uri]);
+      const picked = result.assets[0];
+      setImages(prev => [...prev, picked.uri]);
+      setImageMetaMap(prev => ({
+        ...prev,
+        [picked.uri]: {
+          fileName: picked.fileName,
+          mimeType: picked.mimeType,
+        },
+      }));
     }
   };
 
   const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+    setImages(prev => {
+      const imageToRemove = prev[index];
+      if (imageToRemove) {
+        setImageMetaMap(current => {
+          const next = { ...current };
+          delete next[imageToRemove];
+          return next;
+        });
+      }
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleCategorySelect = (value: string) => {
@@ -152,18 +181,18 @@ export default function PostScreen() {
   const handleSubmit = async () => {
     if (!user?.phone || !user?.location) {
       Alert.alert(
-        'Profil incomplet',
-        'Complétez votre numéro WhatsApp et votre ville.',
+        txt('Profil incomplet', 'Incomplete profile'),
+        txt('Complétez votre numéro WhatsApp et votre ville.', 'Complete your WhatsApp number and city.'),
         [
-          { text: 'Compléter', onPress: () => router.push('/auth/complete-profile') },
-          { text: 'Annuler', style: 'cancel' },
+          { text: txt('Compléter', 'Complete'), onPress: () => router.push('/auth/complete-profile') },
+          { text: txt('Annuler', 'Cancel'), style: 'cancel' },
         ]
       );
       return;
     }
 
     if (!title || !category || !description || !price || images.length === 0) {
-      Alert.alert('Erreur', 'Tous les champs et au moins une image sont requis.');
+      Alert.alert(txt('Erreur', 'Error'), txt('Tous les champs et au moins une image sont requis.', 'All fields and at least one image are required.'));
       return;
     }
 
@@ -176,7 +205,7 @@ export default function PostScreen() {
         .select('credits')
         .eq('id', user.id)
         .single();
-      if (userErr) throw new Error(`Erreur lors de la vérification des crédits: ${userErr.message}`);
+      if (userErr) throw new Error(`${txt('Erreur lors de la vérification des crédits', 'Error while checking credits')}: ${userErr.message}`);
       if (!userData || userData.credits <= 0) {
         setShowNoCreditsPopup(true);
         setIsSubmitting(false);
@@ -189,18 +218,53 @@ export default function PostScreen() {
         .select('id')
         .eq('slug', category)
         .single();
-      if (catErr) throw new Error(`Erreur catégorie: ${catErr.message}`);
-      if (!catData) throw new Error('Catégorie introuvable');
+      if (catErr) throw new Error(`${txt('Erreur catégorie', 'Category error')}: ${catErr.message}`);
+      if (!catData) throw new Error(txt('Catégorie introuvable', 'Category not found'));
+
+      const extensionFromFileName = (fileName?: string | null): string | null => {
+        if (!fileName || !fileName.includes('.')) return null;
+        return fileName.split('.').pop()?.toLowerCase() || null;
+      };
+
+      const extensionFromUri = (uri: string): string | null => {
+        try {
+          const parsedUrl = new URL(uri);
+          const path = parsedUrl.pathname || '';
+          if (!path.includes('.')) return null;
+          return path.split('.').pop()?.toLowerCase() || null;
+        } catch {
+          if (!uri.includes('.')) return null;
+          const normalized = uri.split('?')[0].split('#')[0];
+          return normalized.split('.').pop()?.toLowerCase() || null;
+        }
+      };
+
+      const extensionFromMimeType = (mimeType?: string | null): string | null => {
+        if (!mimeType?.includes('/')) return null;
+        const subtype = mimeType.split('/')[1]?.toLowerCase();
+        if (!subtype) return null;
+        if (subtype === 'jpeg') return 'jpg';
+        if (subtype === 'svg+xml') return 'svg';
+        return subtype;
+      };
+
+      const sanitizeExtension = (extension: string | null): string => {
+        if (!extension) return 'jpg';
+        const cleaned = extension.replace(/[^a-z0-9]/gi, '').toLowerCase();
+        return cleaned || 'jpg';
+      };
 
       // Helper function to get proper MIME type
-      const getMimeType = (uri: string): string => {
-        const extension = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const getMimeType = (extension: string, providedMimeType?: string | null): string => {
+        if (providedMimeType) return providedMimeType;
         const mimeTypes: Record<string, string> = {
           jpg: 'image/jpeg',
           jpeg: 'image/jpeg',
           png: 'image/png',
           gif: 'image/gif',
           webp: 'image/webp',
+          heic: 'image/heic',
+          heif: 'image/heif',
         };
         return mimeTypes[extension] || 'image/jpeg';
       };
@@ -209,9 +273,14 @@ export default function PostScreen() {
       const imageUrls = await Promise.all(
         images.map(async (uri, idx) => {
           try {
-            const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+            const imageMeta = imageMetaMap[uri];
+            const ext = sanitizeExtension(
+              extensionFromFileName(imageMeta?.fileName) ||
+              extensionFromMimeType(imageMeta?.mimeType) ||
+              extensionFromUri(uri)
+            );
             const fileName = `${user.id}/${Date.now()}-${idx}.${ext}`;
-            const mimeType = getMimeType(uri);
+            let mimeType = getMimeType(ext, imageMeta?.mimeType);
 
             console.log(`Uploading image ${idx + 1}: ${fileName}`);
 
@@ -220,7 +289,11 @@ export default function PostScreen() {
             if (Platform.OS === 'web') {
               // Web: use fetch to get blob
               const response = await fetch(uri);
-              fileData = await response.blob();
+              const blob = await response.blob();
+              fileData = blob;
+              if (!imageMeta?.mimeType && blob.type) {
+                mimeType = blob.type;
+              }
             } else {
               // React Native: use ArrayBuffer approach
               const response = await fetch(uri);
@@ -249,7 +322,7 @@ export default function PostScreen() {
             return urlData.publicUrl;
           } catch (error: any) {
             console.error(`Image ${idx + 1} upload error:`, error);
-            throw new Error(`Échec du téléchargement de l'image ${idx + 1}: ${error.message}`);
+            throw new Error(`${txt("Échec du téléchargement de l'image", 'Image upload failed')} ${idx + 1}: ${error.message}`);
           }
         })
       );
@@ -273,14 +346,14 @@ export default function PostScreen() {
         })
         .select()
         .single();
-      if (insErr) throw new Error(`Erreur d'insertion: ${insErr.message}`);
+      if (insErr) throw new Error(`${txt("Erreur d'insertion", 'Insert error')}: ${insErr.message}`);
 
       // ---------- DEDUCT CREDIT ----------
       const { error: credErr } = await supabase
         .from('users')
         .update({ credits: userData.credits - 1 })
         .eq('id', user.id);
-      if (credErr) throw new Error(`Erreur de déduction de crédit: ${credErr.message}`);
+      if (credErr) throw new Error(`${txt('Erreur de déduction de crédit', 'Credit deduction error')}: ${credErr.message}`);
 
       setNewListingId(listing.id);
       
@@ -296,7 +369,7 @@ export default function PostScreen() {
       resetForm();
     } catch (err: any) {
       console.error('Submit error:', err);
-      Alert.alert('Erreur', err.message ?? 'Publication échouée.');
+      Alert.alert(txt('Erreur', 'Error'), err.message ?? txt('Publication échouée.', 'Publishing failed.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -328,14 +401,14 @@ export default function PostScreen() {
               <View style={styles.messageIconContainer}>
                 <Text style={styles.messageIcon}>🔐</Text>
               </View>
-              <Text style={styles.messageTitle}>Connexion requise</Text>
-              <Text style={styles.messageText}>Connectez-vous pour publier vos annonces et commencer à vendre.</Text>
+              <Text style={styles.messageTitle}>{txt('Connexion requise', 'Sign in required')}</Text>
+              <Text style={styles.messageText}>{txt('Connectez-vous pour publier vos annonces et commencer à vendre.', 'Sign in to post listings and start selling.')}</Text>
               <TouchableOpacity style={styles.modernActionButton} onPress={() => router.push('/auth/login')}>
                 <LinearGradient
                   colors={[Colors.primary, '#7da01a']}
                   style={styles.modernActionButtonGradient}
                 >
-                  <Text style={styles.buttonText}>Se connecter</Text>
+                  <Text style={styles.buttonText}>{txt('Se connecter', 'Sign in')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>

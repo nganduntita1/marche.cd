@@ -15,10 +15,14 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Conversation } from '@/types/chat';
 import Colors from '@/constants/Colors';
+import { useTranslation } from 'react-i18next';
 
 export default function ConversationsScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -105,20 +109,20 @@ export default function ConversationsScreen() {
         <View style={styles.conversationContent}>
           <View style={styles.conversationHeader}>
             <Text style={styles.userName} numberOfLines={1}>
-              {otherUser?.name || 'Utilisateur'}
+              {otherUser?.name || txt('Utilisateur', 'User')}
             </Text>
             <Text style={styles.time}>
-              {new Date(item.last_message_at).toLocaleDateString('fr-FR', {
+              {new Date(item.last_message_at).toLocaleDateString(isFrench ? 'fr-FR' : 'en-US', {
                 day: 'numeric',
                 month: 'short',
               })}
             </Text>
           </View>
           <Text style={styles.listingTitle} numberOfLines={1}>
-            {item.listing?.title || 'Annonce supprimée'}
+            {item.listing?.title || txt('Annonce supprimée', 'Deleted listing')}
           </Text>
           <Text style={styles.lastMessage} numberOfLines={2}>
-            {item.last_message || 'Aucun message'}
+            {item.last_message || txt('Aucun message', 'No message')}
           </Text>
         </View>
       </TouchableOpacity>
@@ -136,15 +140,15 @@ export default function ConversationsScreen() {
           />
         </View>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>Connexion requise</Text>
+          <Text style={styles.emptyTitle}>{txt('Connexion requise', 'Sign in required')}</Text>
           <Text style={styles.emptyText}>
-            Connectez-vous pour voir vos conversations
+            {txt('Connectez-vous pour voir vos conversations', 'Sign in to view your conversations')}
           </Text>
           <TouchableOpacity
             style={styles.button}
             onPress={() => router.push('/auth/login')}
           >
-            <Text style={styles.buttonText}>Se connecter</Text>
+            <Text style={styles.buttonText}>{txt('Se connecter', 'Sign in')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -176,15 +180,15 @@ export default function ConversationsScreen() {
           style={styles.logoImage}
           resizeMode="contain"
         />
-        <Text style={styles.headerTitle}>Messages</Text>
+        <Text style={styles.headerTitle}>{txt('Messages', 'Messages')}</Text>
       </View>
 
       {conversations.length === 0 ? (
         <View style={styles.emptyContainer}>
           <MessageCircle size={64} color="#cbd5e1" />
-          <Text style={styles.emptyTitle}>Aucune conversation</Text>
+          <Text style={styles.emptyTitle}>{txt('Aucune conversation', 'No conversations')}</Text>
           <Text style={styles.emptyText}>
-            Vos conversations avec les vendeurs apparaîtront ici
+            {txt('Vos conversations avec les vendeurs apparaîtront ici', 'Your conversations with sellers will appear here')}
           </Text>
         </View>
       ) : (

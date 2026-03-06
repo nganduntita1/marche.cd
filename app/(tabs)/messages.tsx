@@ -16,10 +16,14 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/contexts/MessagesContext';
 import { Conversation } from '@/types/chat';
+import { useTranslation } from 'react-i18next';
 
 export default function MessagesScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   const { refreshUnreadCount } = useMessages();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -424,13 +428,13 @@ export default function MessagesScreen() {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'À l\'instant';
+    if (diffMins < 1) return txt("À l'instant", 'Just now');
     if (diffMins < 60) return `${diffMins}m`;
     if (diffHours < 24) return `${diffHours}h`;
-    if (diffDays === 1) return 'Hier';
-    if (diffDays < 7) return `${diffDays}j`;
+    if (diffDays === 1) return txt('Hier', 'Yesterday');
+    if (diffDays < 7) return isFrench ? `${diffDays}j` : `${diffDays}d`;
     
-    return date.toLocaleDateString('fr-FR', {
+    return date.toLocaleDateString(isFrench ? 'fr-FR' : 'en-US', {
       day: 'numeric',
       month: 'short',
     });
@@ -467,7 +471,7 @@ export default function MessagesScreen() {
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarText}>
-                {(otherUser?.name || 'U')[0].toUpperCase()}
+                {(otherUser?.name || txt('U', 'U'))[0].toUpperCase()}
               </Text>
             </View>
           )}
@@ -481,7 +485,7 @@ export default function MessagesScreen() {
         <View style={styles.conversationContent}>
           <View style={styles.conversationHeader}>
             <Text style={[styles.userName, hasUnread && styles.userNameUnread]} numberOfLines={1}>
-              {otherUser?.name || 'Utilisateur'}
+              {otherUser?.name || txt('Utilisateur', 'User')}
             </Text>
             <Text style={[styles.time, hasUnread && styles.timeUnread]}>
               {formatTime(item.last_message_at)}
@@ -493,7 +497,7 @@ export default function MessagesScreen() {
               style={[styles.lastMessage, hasUnread && styles.lastMessageUnread]} 
               numberOfLines={2}
             >
-              {item.last_message || 'Aucun message'}
+              {item.last_message || txt('Aucun message', 'No message')}
             </Text>
             {hasUnread && (
               <View style={styles.unreadBadge}>
@@ -526,15 +530,15 @@ export default function MessagesScreen() {
           </View>
           <View style={styles.emptyContainer}>
             <MessageCircle size={64} color="#cbd5e1" strokeWidth={1.5} />
-            <Text style={styles.emptyTitle}>Connexion requise</Text>
+            <Text style={styles.emptyTitle}>{txt('Connexion requise', 'Sign in required')}</Text>
             <Text style={styles.emptyText}>
-              Connectez-vous pour voir vos conversations
+              {txt('Connectez-vous pour voir vos conversations', 'Sign in to view your conversations')}
             </Text>
             <TouchableOpacity
               style={styles.button}
               onPress={() => router.push('/auth/login')}
             >
-              <Text style={styles.buttonText}>Se connecter</Text>
+              <Text style={styles.buttonText}>{txt('Se connecter', 'Sign in')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -621,7 +625,7 @@ export default function MessagesScreen() {
             <Search size={18} color="#8e8e93" strokeWidth={2} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Rechercher"
+              placeholder={txt('Rechercher', 'Search')}
               placeholderTextColor="#8e8e93"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -632,9 +636,9 @@ export default function MessagesScreen() {
         {conversations.length === 0 ? (
           <View style={styles.emptyContainer}>
             <MessageCircle size={64} color="#cbd5e1" strokeWidth={1.5} />
-            <Text style={styles.emptyTitle}>Aucune conversation</Text>
+            <Text style={styles.emptyTitle}>{txt('Aucune conversation', 'No conversations')}</Text>
             <Text style={styles.emptyText}>
-              Vos conversations avec les vendeurs apparaîtront ici
+              {txt('Vos conversations avec les vendeurs apparaîtront ici', 'Your conversations with sellers will appear here')}
             </Text>
           </View>
         ) : (

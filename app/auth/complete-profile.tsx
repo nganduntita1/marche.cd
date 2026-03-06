@@ -22,6 +22,7 @@ import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
 import { GuidedTour } from '@/components/guidance/GuidedTour';
 import { Tooltip } from '@/components/guidance/Tooltip';
+import { useTranslation } from 'react-i18next';
 
 export default function CompleteProfileScreen() {
   const [whatsapp, setWhatsapp] = useState('');
@@ -29,6 +30,9 @@ export default function CompleteProfileScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { user, loadUserProfile } = useAuth();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const txt = (fr: string, en: string) => (isFrench ? fr : en);
   
   // Guidance state
   const guidance = useGuidance();
@@ -87,12 +91,12 @@ export default function CompleteProfileScreen() {
 
   const handleComplete = async () => {
     if (!whatsapp || !location) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      Alert.alert(txt('Erreur', 'Error'), txt('Veuillez remplir tous les champs', 'Please fill in all fields'));
       return;
     }
 
     if (!user?.id) {
-      Alert.alert('Erreur', 'Veuillez vous connecter');
+      Alert.alert(txt('Erreur', 'Error'), txt('Veuillez vous connecter', 'Please sign in'));
       router.replace('/auth/login');
       return;
     }
@@ -119,7 +123,7 @@ export default function CompleteProfileScreen() {
       // Navigate to home page
       router.replace('/(tabs)');
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Erreur lors de la mise à jour du profil');
+      Alert.alert(txt('Erreur', 'Error'), error.message || txt('Erreur lors de la mise à jour du profil', 'Error updating profile'));
     } finally {
       setLoading(false);
     }
@@ -154,17 +158,17 @@ export default function CompleteProfileScreen() {
                 resizeMode="contain" 
               />
               <View style={styles.welcomeContainer}>
-                <Text style={styles.welcomeText}>Complétez votre profil</Text>
+                <Text style={styles.welcomeText}>{txt('Complétez votre profil', 'Complete your profile')}</Text>
               </View>
               <Text style={styles.subtitle}>
-                Ajoutez vos informations pour commencer à vendre sur Marche CD
+                {txt('Ajoutez vos informations pour commencer à vendre sur Marche CD', 'Add your details to start selling on Marché.cd')}
               </Text>
             </LinearGradient>
           </LinearGradient>
 
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Numéro WhatsApp</Text>
+              <Text style={styles.label}>{txt('Numéro WhatsApp', 'WhatsApp number')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -183,7 +187,7 @@ export default function CompleteProfileScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Ville</Text>
+              <Text style={styles.label}>{txt('Ville', 'City')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -206,7 +210,7 @@ export default function CompleteProfileScreen() {
               disabled={loading}
             >
               <Text style={styles.buttonText}>
-                {loading ? 'Enregistrement...' : 'Compléter mon profil'}
+                {loading ? txt('Enregistrement...', 'Saving...') : txt('Compléter mon profil', 'Complete my profile')}
               </Text>
             </TouchableOpacity>
 
@@ -214,7 +218,7 @@ export default function CompleteProfileScreen() {
               style={styles.skipButton}
               onPress={() => router.replace('/(tabs)')}
             >
-              <Text style={styles.skipText}>Passer pour l'instant</Text>
+              <Text style={styles.skipText}>{txt("Passer pour l'instant", 'Skip for now')}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
