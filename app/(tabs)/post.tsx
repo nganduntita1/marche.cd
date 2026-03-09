@@ -107,11 +107,13 @@ export default function PostScreen() {
       Alert.alert(txt('Permission refusée', 'Permission denied'), txt('Accès à la bibliothèque de photos requis.', 'Photo library access is required.'));
       return;
     }
-
+    
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
-      quality: 0.8,
+      quality: 0.7,
+      base64: false,
+      exif: false,
     });
 
     if (!result.canceled && result.assets?.[0]?.uri) {
@@ -159,7 +161,8 @@ export default function PostScreen() {
         }
       }
     } catch (error) {
-      console.log('Could not detect location:', error);
+      console.error('[Location] Detection failed:', error);
+      console.log('[Location] Continuing with manual city selection');
     } finally {
       setDetectingLocation(false);
     }
@@ -179,7 +182,13 @@ export default function PostScreen() {
   }, []);
 
   const handleSubmit = async () => {
+    console.log('[POST] Starting submission process...');
+    console.log('[POST] Platform:', Platform.OS);
+    console.log('[POST] User ID:', user?.id);
+    
+    // Validation
     if (!user?.phone || !user?.location) {
+      console.log('[POST] Validation failed: Incomplete profile');
       Alert.alert(
         txt('Profil incomplet', 'Incomplete profile'),
         txt('Complétez votre numéro WhatsApp et votre ville.', 'Complete your WhatsApp number and city.'),
@@ -191,35 +200,113 @@ export default function PostScreen() {
       return;
     }
 
+    // Basic field validation
     if (!title || !category || !description || !price || images.length === 0) {
+      console.log('[POST] Validation failed:', { 
+        hasTitle: !!title, 
+        hasCategory: !!category, 
+        hasDescription: !!description, 
+        hasPrice: !!price, 
+        imageCount: images.length 
+      });
       Alert.alert(txt('Erreur', 'Error'), txt('Tous les champs et au moins une image sont requis.', 'All fields and at least one image are required.'));
       return;
     }
 
+    // Description length validation (backend requires minimum 20 characters)
+    const MIN_DESCRIPTION_LENGTH = 20;
+    if (description.trim().length < MIN_DESCRIPTION_LENGTH) {
+      console.log('[POST] Validation failed: Description too short', description.trim().length);
+      Alert.alert(
+        txt('Description trop courte', 'Description too short'),
+        txt(
+          `La description doit contenir au moins ${MIN_DESCRIPTION_LENGTH} caractères pour aider les acheteurs à comprendre votre article.\n\nActuellement: ${description.trim().length} caractères\nManquant: ${MIN_DESCRIPTION_LENGTH - description.trim().length} caractères`,
+          `Description must be at least ${MIN_DESCRIPTION_LENGTH} characters to help buyers understand your item.\n\nCurrent: ${description.trim().length} characters\nNeeded: ${MIN_DESCRIPTION_LENGTH - description.trim().length} more characters`
+        )
+      );
+      return;
+    }
+
+    // Title length validation
+    const MIN_TITLE_LENGTH = 5;
+    if (title.trim().length < MIN_TITLE_LENGTH) {
+      console.log('[POST] Validation failed: Title too short', title.length);
+      Alert.alert(
+        txt('Titre trop court', 'Title too short'),
+        txt(
+          `Le titre doit contenir au moins ${MIN_TITLE_LENGTH} caractères. Actuellement: ${title.trim().length} caractères.`,
+          `Title must be at least ${MIN_TITLE_LENGTH} characters. Currently: ${title.trim().length} characters.`
+        )
+      );
+      return;
+    }
+
+    // Price validation
+    const priceValue = parseFloat(price);
+    if (isNaN(priceValue) || priceValue <= 0) {
+      console.log('[POST] Validation failed: Invalid price', price);
+      Alert.alert(
+        txt('Prix invalide', 'Invalid price'),
+        txt('Veuillez entrer un prix valide supérieur à 0.', 'Please enter a valid price greater than 0.')
+      );
+      return;
+    }
+
+    console.log('[POST] Validation passed');
+    console.log('[POST] Form data:', { 
+      title: title.trim(), 
+      titleLength: title.trim().length,
+      category, 
+      descriptionLength: description.trim().length, 
+      price: priceValue, 
+      imageCount: images.length,
+      city,
+      hasCoordinates: !!(latitude && longitude)
+    });
+
     setIsSubmitting(true);
 
     try {
-      // ---------- Credits ----------
+      // Check credits
+      console.log('[POST] Checking user credits...');
       const { data: userData, error: userErr } = await supabase
         .from('users')
         .select('credits')
         .eq('id', user.id)
         .single();
-      if (userErr) throw new Error(`${txt('Erreur lors de la vérification des crédits', 'Error while checking credits')}: ${userErr.message}`);
+      
+      if (userErr) {
+        console.error('[POST] Credits check error:', userErr);
+        throw new Error(`Credits error: ${userErr.message}`);
+      }
+      
+      console.log('[POST] User credits:', userData?.credits);
+      
       if (!userData || userData.credits <= 0) {
+        console.log('[POST] Insufficient credits');
         setShowNoCreditsPopup(true);
-        setIsSubmitting(false);
         return;
       }
 
-      // ---------- Category ----------
+      // Get category
+      console.log('[POST] Fetching category ID for:', category);
       const { data: catData, error: catErr } = await supabase
         .from('categories')
         .select('id')
         .eq('slug', category)
         .single();
-      if (catErr) throw new Error(`${txt('Erreur catégorie', 'Category error')}: ${catErr.message}`);
-      if (!catData) throw new Error(txt('Catégorie introuvable', 'Category not found'));
+      
+      if (catErr) {
+        console.error('[POST] Category fetch error:', catErr);
+        throw new Error(`Category error: ${catErr.message}`);
+      }
+      
+      if (!catData) {
+        console.error('[POST] Category not found:', category);
+        throw new Error('Category not found');
+      }
+      
+      console.log('[POST] Category ID:', catData.id);
 
       const extensionFromFileName = (fileName?: string | null): string | null => {
         if (!fileName || !fileName.includes('.')) return null;
@@ -254,7 +341,6 @@ export default function PostScreen() {
         return cleaned || 'jpg';
       };
 
-      // Helper function to get proper MIME type
       const getMimeType = (extension: string, providedMimeType?: string | null): string => {
         if (providedMimeType) return providedMimeType;
         const mimeTypes: Record<string, string> = {
@@ -269,108 +355,207 @@ export default function PostScreen() {
         return mimeTypes[extension] || 'image/jpeg';
       };
 
-      // ---------- IMAGE UPLOAD ----------
-      const imageUrls = await Promise.all(
-        images.map(async (uri, idx) => {
+      // Upload images
+      console.log('[POST] Starting image upload process...');
+      console.log('[POST] Number of images to upload:', images.length);
+      const imageUrls: string[] = [];
+      
+      for (let idx = 0; idx < images.length; idx++) {
+        const uri = images[idx];
+        console.log(`[POST] Processing image ${idx + 1}/${images.length}`);
+        console.log(`[POST] Image URI:`, uri.substring(0, 50) + '...');
+        
+        const imageMeta = imageMetaMap[uri];
+        console.log(`[POST] Image meta:`, imageMeta);
+        
+        const ext = sanitizeExtension(
+          extensionFromFileName(imageMeta?.fileName) ||
+          extensionFromMimeType(imageMeta?.mimeType) ||
+          extensionFromUri(uri)
+        );
+        
+        console.log(`[POST] Detected extension:`, ext);
+        
+        const fileName = `${user.id}/${Date.now()}-${idx}.${ext}`;
+        let mimeType = getMimeType(ext, imageMeta?.mimeType);
+        console.log(`[POST] File name:`, fileName);
+        console.log(`[POST] MIME type:`, mimeType);
+
+        let fileData: any;
+
+        if (Platform.OS === 'web') {
+          console.log(`[POST] Web platform - fetching blob...`);
           try {
-            const imageMeta = imageMetaMap[uri];
-            const ext = sanitizeExtension(
-              extensionFromFileName(imageMeta?.fileName) ||
-              extensionFromMimeType(imageMeta?.mimeType) ||
-              extensionFromUri(uri)
-            );
-            const fileName = `${user.id}/${Date.now()}-${idx}.${ext}`;
-            let mimeType = getMimeType(ext, imageMeta?.mimeType);
-
-            console.log(`Uploading image ${idx + 1}: ${fileName}`);
-
-            let fileData: any;
-
-            if (Platform.OS === 'web') {
-              // Web: use fetch to get blob
-              const response = await fetch(uri);
-              const blob = await response.blob();
-              fileData = blob;
-              if (!imageMeta?.mimeType && blob.type) {
-                mimeType = blob.type;
-              }
-            } else {
-              // React Native: use ArrayBuffer approach
-              const response = await fetch(uri);
-              const arrayBuffer = await response.arrayBuffer();
-              fileData = arrayBuffer;
+            const response = await fetch(uri);
+            if (!response.ok) {
+              console.error(`[POST] Fetch failed:`, response.status, response.statusText);
+              throw new Error(`Failed to load image ${idx + 1}: ${response.statusText}`);
             }
-
-            const { error: uploadError } = await supabase.storage
-              .from('listings')
-              .upload(fileName, fileData, {
-                contentType: mimeType,
-                cacheControl: '3600',
-                upsert: false,
-              });
-
-            if (uploadError) {
-              console.error('Upload error:', uploadError);
-              throw uploadError;
+            
+            const blob = await response.blob();
+            console.log(`[POST] Blob size:`, blob.size, 'bytes');
+            console.log(`[POST] Blob type:`, blob.type);
+            
+            if (blob.size === 0) {
+              console.error(`[POST] Empty blob for image ${idx + 1}`);
+              throw new Error(`Image ${idx + 1} is empty`);
             }
-
-            const { data: urlData } = supabase.storage
-              .from('listings')
-              .getPublicUrl(fileName);
-
-            console.log(`Image ${idx + 1} uploaded successfully`);
-            return urlData.publicUrl;
-          } catch (error: any) {
-            console.error(`Image ${idx + 1} upload error:`, error);
-            throw new Error(`${txt("Échec du téléchargement de l'image", 'Image upload failed')} ${idx + 1}: ${error.message}`);
+            
+            fileData = blob;
+            if (blob.type) mimeType = blob.type;
+          } catch (fetchError: any) {
+            console.error(`[POST] Blob fetch error:`, fetchError);
+            throw new Error(`Failed to process image ${idx + 1}: ${fetchError.message}`);
           }
-        })
-      );
+        } else {
+          console.log(`[POST] Native platform - fetching array buffer...`);
+          try {
+            const response = await fetch(uri);
+            if (!response.ok) {
+              console.error(`[POST] Fetch failed:`, response.status, response.statusText);
+              throw new Error(`Failed to load image ${idx + 1}: ${response.statusText}`);
+            }
+            fileData = await response.arrayBuffer();
+            console.log(`[POST] ArrayBuffer size:`, fileData.byteLength, 'bytes');
+          } catch (fetchError: any) {
+            console.error(`[POST] ArrayBuffer fetch error:`, fetchError);
+            throw new Error(`Failed to process image ${idx + 1}: ${fetchError.message}`);
+          }
+        }
 
-      // ---------- INSERT LISTING ----------
+        console.log(`[POST] Uploading to Supabase storage...`);
+        const { error: uploadError } = await supabase.storage
+          .from('listings')
+          .upload(fileName, fileData, {
+            contentType: mimeType,
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error(`[POST] Upload error for image ${idx + 1}:`, uploadError);
+          throw new Error(`Upload failed for image ${idx + 1}: ${uploadError.message}`);
+        }
+
+        console.log(`[POST] Image ${idx + 1} uploaded successfully`);
+
+        const { data: urlData } = supabase.storage
+          .from('listings')
+          .getPublicUrl(fileName);
+
+        console.log(`[POST] Public URL:`, urlData.publicUrl);
+        imageUrls.push(urlData.publicUrl);
+      }
+      
+      console.log('[POST] All images uploaded successfully');
+      console.log('[POST] Image URLs:', imageUrls);
+
+      // Insert listing
+      console.log('[POST] Creating listing record...');
+      const listingData = {
+        seller_id: user.id,
+        title: title.trim(),
+        category_id: catData.id,
+        description: description.trim(),
+        price: parseFloat(price),
+        images: imageUrls,
+        status: 'pending',
+        location: user.location,
+        latitude,
+        longitude,
+        city: city || currentCity || user.location,
+        country: 'Congo (RDC)',
+      };
+      
+      console.log('[POST] Listing data:', {
+        ...listingData,
+        images: `[${listingData.images.length} URLs]`,
+        titleLength: listingData.title.length,
+        descriptionLength: listingData.description.length
+      });
+      
       const { data: listing, error: insErr } = await supabase
         .from('listings')
-        .insert({
-          seller_id: user.id,
-          title,
-          category_id: catData.id,
-          description,
-          price: parseFloat(price),
-          images: imageUrls,
-          status: 'active',
-          location: user.location,
-          latitude,
-          longitude,
-          city: city || currentCity || user.location,
-          country: 'Congo (RDC)',
-        })
+        .insert(listingData)
         .select()
         .single();
-      if (insErr) throw new Error(`${txt("Erreur d'insertion", 'Insert error')}: ${insErr.message}`);
+      
+      if (insErr) {
+        console.error('[POST] Insert error:', insErr);
+        throw new Error(`Insert error: ${insErr.message}`);
+      }
+      
+      console.log('[POST] Listing created with ID:', listing.id);
 
-      // ---------- DEDUCT CREDIT ----------
+      // Deduct credit
+      console.log('[POST] Deducting credit...');
       const { error: credErr } = await supabase
         .from('users')
         .update({ credits: userData.credits - 1 })
         .eq('id', user.id);
-      if (credErr) throw new Error(`${txt('Erreur de déduction de crédit', 'Credit deduction error')}: ${credErr.message}`);
+      
+      if (credErr) {
+        console.error('[POST] Credit deduction error:', credErr);
+        throw new Error(`Credit deduction error: ${credErr.message}`);
+      }
+      
+      console.log('[POST] Credit deducted successfully');
+      console.log('[POST] Remaining credits:', userData.credits - 1);
 
       setNewListingId(listing.id);
       
-      // Mark first listing action as completed
-      await markActionCompleted('first_listing_posted');
-      
-      // Trigger success celebration if this is the first listing
-      if (guidanceRef.current?.triggerSuccessCelebration) {
-        guidanceRef.current.triggerSuccessCelebration();
+      try {
+        await markActionCompleted('first_listing_posted');
+      } catch {
+        // Ignore
       }
       
+      try {
+        if (guidanceRef.current?.triggerSuccessCelebration) {
+          guidanceRef.current.triggerSuccessCelebration();
+        }
+      } catch {
+        // Ignore
+      }
+      
+      console.log('[POST] ✅ Listing creation completed successfully!');
       setShowSuccessPopup(true);
       resetForm();
     } catch (err: any) {
-      console.error('Submit error:', err);
-      Alert.alert(txt('Erreur', 'Error'), err.message ?? txt('Publication échouée.', 'Publishing failed.'));
+      console.error('[POST] ❌ Error during submission:', err);
+      console.error('[POST] Error stack:', err?.stack);
+      console.error('[POST] Full error object:', JSON.stringify(err, null, 2));
+      
+      let errorMsg = err?.message || err?.toString() || 'Failed to create listing';
+      
+      // Check for specific database validation errors
+      if (errorMsg.includes('description') || errorMsg.includes('check constraint')) {
+        console.error('[POST] Description validation error detected');
+        errorMsg = txt(
+          'La description doit contenir au moins 20 caractères pour créer une annonce. Veuillez ajouter plus de détails sur votre article.',
+          'Description must be at least 20 characters to create a listing. Please add more details about your item.'
+        );
+      } else if (errorMsg.includes('violates check constraint') || errorMsg.includes('constraint')) {
+        console.error('[POST] Database constraint error detected');
+        errorMsg = txt(
+          'Erreur de validation: Veuillez vérifier que tous les champs sont correctement remplis. La description doit contenir au moins 20 caractères.',
+          'Validation error: Please check that all fields are properly filled. Description must be at least 20 characters.'
+        );
+      } else if (errorMsg.includes('null value') || errorMsg.includes('NOT NULL')) {
+        console.error('[POST] NULL value error detected');
+        errorMsg = txt(
+          'Tous les champs requis doivent être remplis. Assurez-vous d\'avoir ajouté un titre, une description (min 20 caractères), un prix et au moins une image.',
+          'All required fields must be filled. Make sure you have added a title, description (min 20 chars), price and at least one image.'
+        );
+      }
+      
+      console.error('[POST] Error message shown to user:', errorMsg);
+      Alert.alert(
+        txt('Erreur de création', 'Creation Error'),
+        errorMsg
+      );
     } finally {
+      console.log('[POST] Submission process ended');
       setIsSubmitting(false);
     }
   };
@@ -566,7 +751,21 @@ export default function PostScreen() {
                 maxLength={100} 
               />
             </View>
-            <Text style={styles.characterCount}>{title.length}/100</Text>
+            <View style={styles.characterCountRow}>
+              <Text style={[
+                styles.characterCount,
+                title.trim().length < 5 && title.length > 0 && styles.characterCountWarning
+              ]}>
+                {title.trim().length < 5 
+                  ? `${title.trim().length}/5 minimum` 
+                  : `${title.length}/100`}
+              </Text>
+              {title.trim().length < 5 && title.length > 0 && (
+                <Text style={styles.validationHint}>
+                  ⚠️ {5 - title.trim().length} caractères restants
+                </Text>
+              )}
+            </View>
           </View>
 
           {/* Category */}
@@ -615,7 +814,7 @@ export default function PostScreen() {
               <FileText size={18} color={Colors.primary} />
               <Text style={styles.label}>Description *</Text>
             </View>
-            <Text style={styles.labelHint}>Décrivez l'état, les caractéristiques et les détails importants</Text>
+            <Text style={styles.labelHint}>Décrivez l'état, les caractéristiques et les détails importants (minimum 20 caractères)</Text>
             <View style={styles.inputContainer}>
               <TextInput
                 style={[styles.input, styles.textArea]}
@@ -634,7 +833,21 @@ export default function PostScreen() {
                 textAlignVertical="top"
               />
             </View>
-            <Text style={styles.characterCount}>{description.length}/1000</Text>
+            <View style={styles.characterCountRow}>
+              <Text style={[
+                styles.characterCount,
+                description.trim().length < 20 && description.length > 0 && styles.characterCountWarning
+              ]}>
+                {description.trim().length < 20 
+                  ? `${description.trim().length}/20 minimum requis` 
+                  : `${description.length}/1000`}
+              </Text>
+              {description.trim().length < 20 && description.length > 0 && (
+                <Text style={styles.validationHint}>
+                  ⚠️ Encore {20 - description.trim().length} caractères
+                </Text>
+              )}
+            </View>
           </View>
 
           {/* Price */}
@@ -982,6 +1195,21 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'right',
     marginTop: 4,
+  },
+  characterCountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  characterCountWarning: {
+    color: '#f59e0b',
+    fontWeight: '600',
+  },
+  validationHint: {
+    fontSize: 12,
+    color: '#f59e0b',
+    fontWeight: '500',
   },
 
   // Select styles
