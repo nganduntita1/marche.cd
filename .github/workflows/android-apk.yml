@@ -1,0 +1,45 @@
+name: Android APK Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-android-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build Android APK with EAS
+        run: |
+          eas build --platform android --profile apk --non-interactive --wait --json > eas-build-result.json
+          node -e "const fs=require('fs');const result=JSON.parse(fs.readFileSync('eas-build-result.json','utf8'));const build=Array.isArray(result)?result[0]:result;if(!build||!build.id){throw new Error('Unable to resolve EAS build id from eas-build-result.json');}fs.appendFileSync(process.env.GITHUB_ENV, 'EAS_BUILD_ID='+build.id+'\\n');"
+
+      - name: Download latest Android APK
+        run: eas build:download --id "$EAS_BUILD_ID" --path marche-cd.apk --non-interactive
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: marche-cd-android-apk
+          path: marche-cd.apk
+          if-no-files-found: error
