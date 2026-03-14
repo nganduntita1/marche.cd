@@ -459,7 +459,7 @@ export default function PostScreen() {
         description: description.trim(),
         price: parseFloat(price),
         images: imageUrls,
-        status: 'pending',
+        status: 'active',
         location: user.location,
         latitude,
         longitude,

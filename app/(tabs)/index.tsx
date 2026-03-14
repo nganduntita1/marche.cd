@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -66,6 +66,7 @@ export default function HomeScreen() {
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [stats, setStats] = useState({ totalListings: 0, totalFavorites: 0, todayListings: 0 });
   const [userFavoritesCount, setUserFavoritesCount] = useState(0);
+  const [favoriteListingIds, setFavoriteListingIds] = useState<Set<string>>(new Set());
   const [searchRadius, setSearchRadius] = useState<number | null>(null); // null = show all
   const [showRadiusModal, setShowRadiusModal] = useState(false);
   const router = useRouter();
@@ -91,11 +92,20 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadCategories();
-    loadListings();
     loadStats();
-    loadUserFavoritesCount();
+  }, []);
 
-    // Set up real-time subscription for listings
+  useEffect(() => {
+    loadListings();
+  }, [selectedCategory, user, sortBy, priceRange]);
+
+  useEffect(() => {
+    loadUserFavoritesCount();
+    loadFavoriteListingIds();
+  }, [user]);
+
+  useEffect(() => {
+    // Keep realtime listeners stable so filter/search changes don't recreate channels.
     const listingsSubscription = supabase
       .channel('listings-channel')
       .on(
@@ -105,15 +115,13 @@ export default function HomeScreen() {
           schema: 'public',
           table: 'listings',
         },
-        (payload) => {
-          console.log('Real-time update:', payload);
+        () => {
           loadListings();
           loadStats();
         }
       )
       .subscribe();
 
-    // Set up real-time subscription for favorites
     const favoritesSubscription = supabase
       .channel('favorites-channel')
       .on(
@@ -123,9 +131,9 @@ export default function HomeScreen() {
           schema: 'public',
           table: 'favorites',
         },
-        (payload) => {
-          console.log('Favorites update:', payload);
+        () => {
           loadUserFavoritesCount();
+          loadFavoriteListingIds();
           loadStats();
         }
       )
@@ -135,7 +143,7 @@ export default function HomeScreen() {
       supabase.removeChannel(listingsSubscription);
       supabase.removeChannel(favoritesSubscription);
     };
-  }, [selectedCategory, user, sortBy, priceRange]);
+  }, []);
 
   // Initialize home screen guidance
   useEffect(() => {
@@ -238,6 +246,26 @@ export default function HomeScreen() {
     }
   };
 
+  const loadFavoriteListingIds = async () => {
+    try {
+      if (!user) {
+        setFavoriteListingIds(new Set());
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('listing_id')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      setFavoriteListingIds(new Set((data || []).map((item) => item.listing_id)));
+    } catch (error) {
+      console.error('Error loading favorite listing IDs:', error);
+      setFavoriteListingIds(new Set());
+    }
+  };
+
   const loadCategories = async () => {
     try {
       const { data, error } = await supabase
@@ -263,12 +291,7 @@ export default function HomeScreen() {
           category:categories(*)
         `);
 
-      // Show active listings to everyone, plus owner's pending listings.
-      if (user?.id) {
-        query = query.or(`status.eq.active,and(status.eq.pending,seller_id.eq.${user.id})`);
-      } else {
-        query = query.eq('status', 'active');
-      }
+      query = query.eq('status', 'active');
 
       // Apply sorting
       if (sortBy === 'recent') {
@@ -378,8 +401,9 @@ export default function HomeScreen() {
   };
 
   // Filter listings by search, category, price, and distance
-  const filteredListings = listings
-    .filter(listing => {
+  const filteredListings = useMemo(() => {
+    return listings
+    .filter((listing) => {
       // Search filter
       const matchesSearch = listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         listing.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -406,7 +430,7 @@ export default function HomeScreen() {
       
       return matchesSearch && matchesCategory && matchesPrice && matchesDistance;
     })
-    .map(listing => {
+    .map((listing) => {
       // Add distance to each listing
       if (userLocation && listing.latitude && listing.longitude) {
         const distance = calculateDistance(
@@ -419,6 +443,27 @@ export default function HomeScreen() {
       }
       return listing;
     });
+  }, [listings, searchQuery, selectedCategory, priceRange, searchRadius, userLocation]);
+
+  const listingMetaById = useMemo(() => {
+    return filteredListings.reduce<Record<string, { sellerRating?: number; isVerified: boolean; views: number }>>(
+      (acc, item) => {
+        // Keep values deterministic by listing id to avoid expensive random recalculation on every render.
+        const hashBase = item.id
+          .split('')
+          .reduce((hash, ch) => ((hash * 31 + ch.charCodeAt(0)) >>> 0), 7);
+        const hasRating = (hashBase % 10) >= 3;
+        const rating = hasRating ? 4 + ((hashBase % 10) / 10) : undefined;
+        acc[item.id] = {
+          sellerRating: rating,
+          isVerified: (hashBase % 2) === 0,
+          views: 100 + (hashBase % 500),
+        };
+        return acc;
+      },
+      {}
+    );
+  }, [filteredListings]);
 
   const renderHeader = () => {
     return (
@@ -611,8 +656,7 @@ export default function HomeScreen() {
         <View key={`row-${i}`} style={styles.row}>
           {rowItems.map((item) => {
             const coercedStatus: 'active' | 'sold' = item.status === 'sold' ? 'sold' : 'active';
-            const mockRating = Math.random() > 0.3 ? (4 + Math.random()).toFixed(1) : undefined;
-            const isVerified = Math.random() > 0.5;
+            const itemMeta = listingMetaById[item.id];
             const isOwner = user?.id === item.seller_id;
             
             return (
@@ -625,10 +669,12 @@ export default function HomeScreen() {
                   status={coercedStatus}
                   location={item.location}
                   distance={(item as any).distance}
-                  sellerRating={mockRating ? parseFloat(mockRating) : undefined}
-                  isVerified={isVerified}
+                  sellerRating={itemMeta?.sellerRating}
+                  isVerified={itemMeta?.isVerified}
                   isOwner={isOwner}
                   isPromoted={item.is_promoted}
+                  isFavoriteInitial={favoriteListingIds.has(item.id)}
+                  skipFavoriteLookup
                   onDelete={loadListings}
                   onPress={() => {
                     markInteraction();
@@ -655,7 +701,7 @@ export default function HomeScreen() {
                 price={featuredItem.price}
                 image={featuredItem.images[0]}
                 location={featuredItem.location}
-                views={Math.floor(Math.random() * 500) + 100}
+                views={listingMetaById[featuredItem.id]?.views || 100}
                 isFeatured={true}
               />
             </View>

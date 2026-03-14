@@ -314,6 +314,30 @@ export default function ListingDetailScreen() {
     router.push(`/chat/${existingConv.id}`);
   };
 
+  const handleOpenChat = async () => {
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
+
+    // Open existing conversation directly without auto-sending a message.
+    const { data: existingConv } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('listing_id', listing?.id)
+      .eq('buyer_id', user.id)
+      .maybeSingle();
+
+    if (existingConv?.id) {
+      router.push(`/chat/${existingConv.id}`);
+      return;
+    }
+
+    // First contact: show safety tips, then create chat with no prefilled message.
+    setPendingMessage('');
+    setShowSafetyTipsModal(true);
+  };
+
   const sendQuickMessage = async (conversationId: string, messageText: string) => {
     try {
       await supabase
@@ -451,7 +475,7 @@ export default function ListingDetailScreen() {
             <Image
               source={{ uri: images[activeImageIndex] }}
               style={styles.image}
-              resizeMode="cover"
+              resizeMode="contain"
             />
           </TouchableOpacity>
 
@@ -883,11 +907,7 @@ export default function ListingDetailScreen() {
               ref={messageButtonRef}
               style={styles.messageButton} 
               onPress={() => {
-                const greeting = txt(
-                  `Bonjour! Je suis intéressé par "${listing.title}" et j'aimerais l'acheter.`,
-                  `Hi! I'm interested in "${listing.title}" and I'd like to buy it.`
-                );
-                handleQuickMessage(greeting);
+                handleOpenChat();
                 // Reset idle timer on interaction
                 if (idleTimer) clearTimeout(idleTimer);
               }}
@@ -1062,12 +1082,12 @@ export default function ListingDetailScreen() {
           setPendingMessage(''); // Clear pending message on close
         }}
         onProceed={() => {
-          // Use the pending message if available, otherwise use default greeting
-          const messageToSend = pendingMessage || txt(
-            `Bonjour! Je suis intéressé par "${listing?.title}" et j'aimerais l'acheter.`,
-            `Hi! I'm interested in "${listing?.title}" and I'd like to buy it.`
-          );
-          proceedToChat(messageToSend);
+          // Send only if user explicitly chose a quick/constructed message.
+          if (pendingMessage) {
+            proceedToChat(pendingMessage);
+          } else {
+            proceedToChat();
+          }
           setPendingMessage(''); // Clear after using
         }}
       />
@@ -1153,11 +1173,7 @@ export default function ListingDetailScreen() {
             {
               label: txt('Message vendeur', 'Message seller'),
               onPress: () => {
-                const greeting = txt(
-                  `Bonjour! Je suis intéressé par "${listing.title}" et j'aimerais l'acheter.`,
-                  `Hi! I'm interested in "${listing.title}" and I'd like to buy it.`
-                );
-                handleQuickMessage(greeting);
+                handleOpenChat();
               },
               primary: true,
             },

@@ -26,6 +26,8 @@ type ListingCardProps = {
   isVerified?: boolean;
   isOwner?: boolean;
   isPromoted?: boolean;
+  isFavoriteInitial?: boolean;
+  skipFavoriteLookup?: boolean;
   onDelete?: () => void;
   onPress?: () => void;
 };
@@ -33,7 +35,7 @@ type ListingCardProps = {
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 64) / 2; // 2 columns with 24px padding on sides and 16px gap
 
-export default function ListingCard({ 
+function ListingCard({ 
   id, 
   title, 
   price, 
@@ -45,19 +47,25 @@ export default function ListingCard({
   isVerified = false,
   isOwner = false,
   isPromoted = false,
+  isFavoriteInitial = false,
+  skipFavoriteLookup = false,
   onDelete,
   onPress,
 }: ListingCardProps) {
   const router = useRouter();
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(isFavoriteInitial);
   const [loading, setLoading] = useState(false);
   const actionPressInProgressRef = useRef(false);
 
   useEffect(() => {
-    if (!isOwner) {
+    setIsFavorite(isFavoriteInitial);
+  }, [isFavoriteInitial, id]);
+
+  useEffect(() => {
+    if (!isOwner && !skipFavoriteLookup) {
       checkFavoriteStatus();
     }
-  }, [id, isOwner]);
+  }, [id, isOwner, skipFavoriteLookup]);
 
   const checkFavoriteStatus = async () => {
     try {
@@ -310,6 +318,24 @@ export default function ListingCard({
     </TouchableOpacity>
   );
 }
+
+export default React.memo(ListingCard, (prevProps, nextProps) => {
+  return (
+    prevProps.id === nextProps.id &&
+    prevProps.title === nextProps.title &&
+    prevProps.price === nextProps.price &&
+    prevProps.image === nextProps.image &&
+    prevProps.status === nextProps.status &&
+    prevProps.location === nextProps.location &&
+    prevProps.distance === nextProps.distance &&
+    prevProps.sellerRating === nextProps.sellerRating &&
+    prevProps.isVerified === nextProps.isVerified &&
+    prevProps.isOwner === nextProps.isOwner &&
+    prevProps.isPromoted === nextProps.isPromoted &&
+    prevProps.isFavoriteInitial === nextProps.isFavoriteInitial &&
+    prevProps.skipFavoriteLookup === nextProps.skipFavoriteLookup
+  );
+});
 
 const styles = StyleSheet.create({
   card: {
