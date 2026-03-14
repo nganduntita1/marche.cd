@@ -29,6 +29,7 @@
       }
     },
     "apk": {
+      "autoIncrement": true,
       "android": {
         "buildType": "apk"
       }

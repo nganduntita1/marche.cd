@@ -1,5 +1,8 @@
 name: Android APK Build
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
@@ -43,3 +46,12 @@ jobs:
           name: marche-cd-android-apk
           path: marche-cd.apk
           if-no-files-found: error
+
+      - name: Publish APK to stable release link
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: Android Latest APK
+          files: marche-cd.apk
+          overwrite_files: true
+          generate_release_notes: false

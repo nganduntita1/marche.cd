@@ -152,7 +152,7 @@ export default function LandingPage() {
   };
 
   const handleDownloadAPK = async () => {
-    const apkUrl = 'https://github.com/nganduntita1/marche.cd/releases/download/v1.0.0/marche-cd.apk';
+    const apkUrl = 'https://github.com/nganduntita1/marche.cd/releases/download/android-latest/marche-cd.apk';
     Linking.openURL(apkUrl);
     
     // Mark action as completed

@@ -2,11 +2,11 @@
 
 ## ✅ Landing Page Updated
 
-Your Android APK download link has been added to the landing page!
+Your Android APK now uses a permanent GitHub release link that stays the same for every new version.
 
 ### Download URL
 ```
-https://expo.dev/artifacts/eas/3rDWMU1yWyXnjiL4YaFwxH.apk
+https://github.com/nganduntita1/marche.cd/releases/download/android-latest/marche-cd.apk
 ```
 
 ### Location
@@ -15,7 +15,7 @@ https://expo.dev/artifacts/eas/3rDWMU1yWyXnjiL4YaFwxH.apk
 
 ```typescript
 const handleDownloadAPK = () => {
-  const apkUrl = 'https://expo.dev/artifacts/eas/3rDWMU1yWyXnjiL4YaFwxH.apk';
+   const apkUrl = 'https://github.com/nganduntita1/marche.cd/releases/download/android-latest/marche-cd.apk';
   Linking.openURL(apkUrl);
 };
 ```
@@ -56,7 +56,7 @@ The download button is in the hero section:
 1. Start dev server: `npm run dev`
 2. Open: `http://localhost:8081/landing`
 3. Click "Télécharger pour Android"
-4. Should open the Expo download URL
+4. Should open the GitHub release download URL
 
 ### Test on Mobile
 1. Open the landing page on your phone
@@ -100,7 +100,7 @@ https://expo.dev/artifacts/eas/3rDWMU1yWyXnjiL4YaFwxH.apk
 
 ### Landing Page
 ```
-https://your-domain.vercel.app/landing
+https://marchecd.tech/landing
 ```
 
 ### Share via:
