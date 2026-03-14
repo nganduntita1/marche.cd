@@ -51,6 +51,7 @@ export default function ProfileScreen() {
         .from('listings')
         .select('*')
         .eq('seller_id', user?.id)
+        .neq('status', 'removed')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

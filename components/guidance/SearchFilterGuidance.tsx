@@ -10,6 +10,7 @@ import { Tooltip } from './Tooltip';
 import { ContextualPrompt } from './ContextualPrompt';
 import { GuidedTour } from './GuidedTour';
 import Colors from '@/constants/Colors';
+import { useTranslation } from 'react-i18next';
 
 interface SearchFilterGuidanceProps {
   // Search state
@@ -50,6 +51,8 @@ export const SearchFilterGuidance: React.FC<SearchFilterGuidanceProps> = ({
   onFilterOpen,
 }) => {
   const guidance = useGuidance();
+  const { i18n } = useTranslation();
+  const isFrench = (i18n.resolvedLanguage || i18n.language || 'fr').toLowerCase().startsWith('fr');
   
   // Tooltip visibility states
   const [showSearchTooltip, setShowSearchTooltip] = useState(false);
@@ -154,25 +157,21 @@ export const SearchFilterGuidance: React.FC<SearchFilterGuidanceProps> = ({
   
   // Get search tooltip content
   const getSearchTooltipContent = () => {
-    const language = guidance.state.settings.language;
-    
     return {
       id: 'search_bar_tips',
-      title: language === 'fr' ? 'Conseils de recherche' : 'Search Tips',
-      message: language === 'fr'
+      title: isFrench ? 'Conseils de recherche' : 'Search Tips',
+      message: isFrench
         ? 'Recherchez par nom d\'article, marque, ou catégorie. Essayez "Samsung", "meubles", ou "vélo" !'
         : 'Search by item name, brand, or category. Try "Samsung", "furniture", or "bike"!',
       placement: 'bottom' as const,
       icon: '🔍',
-      dismissLabel: language === 'fr' ? 'Compris' : 'Got it',
+      dismissLabel: isFrench ? 'Compris' : 'Got it',
     };
   };
   
   // Get no results suggestions
   const getNoResultsSuggestions = () => {
-    const language = guidance.state.settings.language;
-    
-    const suggestions = language === 'fr' ? [
+    const suggestions = isFrench ? [
       'Essayez des mots-clés plus généraux',
       'Vérifiez l\'orthographe',
       'Supprimez les filtres actifs',
@@ -189,42 +188,40 @@ export const SearchFilterGuidance: React.FC<SearchFilterGuidanceProps> = ({
   
   // Get filter panel tour
   const getFilterPanelTour = () => {
-    const language = guidance.state.settings.language;
-    
     return {
       id: 'filter_panel_tour',
-      name: language === 'fr' ? 'Visite du panneau de filtres' : 'Filter Panel Tour',
+      name: isFrench ? 'Visite du panneau de filtres' : 'Filter Panel Tour',
       steps: [
         {
           id: 'filter_step_1',
-          title: language === 'fr' ? 'Filtres de recherche 🎯' : 'Search Filters 🎯',
-          message: language === 'fr'
+          title: isFrench ? 'Filtres de recherche 🎯' : 'Search Filters 🎯',
+          message: isFrench
             ? 'Utilisez ces filtres pour affiner votre recherche et trouver exactement ce que vous cherchez !'
             : 'Use these filters to refine your search and find exactly what you\'re looking for!',
           placement: 'center' as const,
           showOverlay: true,
-          nextLabel: language === 'fr' ? 'Montrez-moi' : 'Show me',
-          skipLabel: language === 'fr' ? 'Passer' : 'Skip',
+          nextLabel: isFrench ? 'Montrez-moi' : 'Show me',
+          skipLabel: isFrench ? 'Passer' : 'Skip',
         },
         {
           id: 'filter_step_2',
-          title: language === 'fr' ? 'Fourchette de prix' : 'Price Range',
-          message: language === 'fr'
+          title: isFrench ? 'Fourchette de prix' : 'Price Range',
+          message: isFrench
             ? 'Définissez un prix minimum et maximum pour voir uniquement les articles dans votre budget.'
             : 'Set a minimum and maximum price to see only items within your budget.',
           placement: 'top' as const,
           showOverlay: true,
-          nextLabel: language === 'fr' ? 'Suivant' : 'Next',
+          nextLabel: isFrench ? 'Suivant' : 'Next',
         },
         {
           id: 'filter_step_3',
-          title: language === 'fr' ? 'Trier les résultats' : 'Sort Results',
-          message: language === 'fr'
+          title: isFrench ? 'Trier les résultats' : 'Sort Results',
+          message: isFrench
             ? 'Triez par prix (croissant/décroissant) ou par date pour voir les annonces les plus récentes.'
             : 'Sort by price (low/high) or by date to see the newest listings first.',
           placement: 'top' as const,
           showOverlay: true,
-          nextLabel: language === 'fr' ? 'Compris' : 'Got it',
+          nextLabel: isFrench ? 'Compris' : 'Got it',
         },
       ],
       triggerCondition: {
@@ -236,36 +233,33 @@ export const SearchFilterGuidance: React.FC<SearchFilterGuidanceProps> = ({
   
   // Get location filter tooltip
   const getLocationFilterTooltip = () => {
-    const language = guidance.state.settings.language;
-    
     return {
       id: 'location_filter_explanation',
-      title: language === 'fr' ? 'Filtre de distance' : 'Distance Filter',
-      message: language === 'fr'
+      title: isFrench ? 'Filtre de distance' : 'Distance Filter',
+      message: isFrench
         ? 'Choisissez un rayon de recherche pour voir les articles à proximité. Plus le rayon est petit, plus les résultats sont proches !'
         : 'Choose a search radius to see items nearby. The smaller the radius, the closer the results!',
       placement: 'bottom' as const,
       icon: '📍',
-      dismissLabel: language === 'fr' ? 'Compris' : 'Got it',
+      dismissLabel: isFrench ? 'Compris' : 'Got it',
     };
   };
   
   // Get price feedback message
   const getPriceFeedbackMessage = () => {
-    const language = guidance.state.settings.language;
-    const min = priceRange.min ? `$${priceRange.min}` : language === 'fr' ? 'Min' : 'Min';
-    const max = priceRange.max ? `$${priceRange.max}` : language === 'fr' ? 'Max' : 'Max';
+    const min = priceRange.min ? `$${priceRange.min}` : 'Min';
+    const max = priceRange.max ? `$${priceRange.max}` : 'Max';
     
     if (priceRange.min && priceRange.max) {
-      return language === 'fr'
+      return isFrench
         ? `Affichage des articles entre ${min} et ${max} • ${resultsCount} résultat${resultsCount !== 1 ? 's' : ''}`
         : `Showing items between ${min} and ${max} • ${resultsCount} result${resultsCount !== 1 ? 's' : ''}`;
     } else if (priceRange.min) {
-      return language === 'fr'
+      return isFrench
         ? `Affichage des articles à partir de ${min} • ${resultsCount} résultat${resultsCount !== 1 ? 's' : ''}`
         : `Showing items from ${min} • ${resultsCount} result${resultsCount !== 1 ? 's' : ''}`;
     } else if (priceRange.max) {
-      return language === 'fr'
+      return isFrench
         ? `Affichage des articles jusqu'à ${max} • ${resultsCount} résultat${resultsCount !== 1 ? 's' : ''}`
         : `Showing items up to ${max} • ${resultsCount} result${resultsCount !== 1 ? 's' : ''}`;
     }
@@ -297,7 +291,7 @@ export const SearchFilterGuidance: React.FC<SearchFilterGuidanceProps> = ({
       {showNoResultsPrompt && (
         <ContextualPrompt
           message={
-            guidance.state.settings.language === 'fr'
+            isFrench
               ? `Aucun résultat pour "${searchQuery}". Essayez ces suggestions :`
               : `No results for "${searchQuery}". Try these suggestions:`
           }

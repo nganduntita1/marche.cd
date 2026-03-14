@@ -40,7 +40,6 @@ import { useTranslation } from 'react-i18next';
 import i18n from '../lib/i18n';
 
 const LANGUAGE_MODE_STORAGE_KEY = 'app_language_mode';
-const LANGUAGE_MODE_MANUAL = 'manual';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -50,7 +49,7 @@ export default function SettingsScreen() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [messageAlerts, setMessageAlerts] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
-  const [language, setLanguage] = useState<'fr' | 'en'>('fr');
+  const [language, setLanguage] = useState<'fr'>('fr');
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -65,30 +64,24 @@ export default function SettingsScreen() {
 
   const loadSettings = async () => {
     try {
-      const savedLanguage = await AsyncStorage.getItem('app_language');
-      const languageMode = await AsyncStorage.getItem(LANGUAGE_MODE_STORAGE_KEY);
       const savedDarkMode = await AsyncStorage.getItem('dark_mode');
-      
-      if (savedLanguage && languageMode === LANGUAGE_MODE_MANUAL) {
-        setLanguage(savedLanguage as 'fr' | 'en');
-      } else {
-        const detected = (i18n.language || 'fr').split('-')[0];
-        if (detected === 'en' || detected === 'fr') {
-          setLanguage(detected);
-        }
-      }
+
+      // Keep settings in sync with the app-wide French-only mode.
+      await AsyncStorage.multiRemove(['app_language', LANGUAGE_MODE_STORAGE_KEY]);
+      setLanguage('fr');
+      await i18n.changeLanguage('fr');
+
       if (savedDarkMode) setDarkMode(savedDarkMode === 'true');
     } catch (error) {
       console.error('Error loading settings:', error);
     }
   };
 
-  const handleLanguageChange = async (newLanguage: 'fr' | 'en') => {
+  const handleLanguageChange = async () => {
     try {
-      await AsyncStorage.setItem('app_language', newLanguage);
-      await AsyncStorage.setItem(LANGUAGE_MODE_STORAGE_KEY, LANGUAGE_MODE_MANUAL);
-      setLanguage(newLanguage);
-      i18n.changeLanguage(newLanguage);
+      await AsyncStorage.multiRemove(['app_language', LANGUAGE_MODE_STORAGE_KEY]);
+      setLanguage('fr');
+      await i18n.changeLanguage('fr');
       setShowLanguageModal(false);
       Alert.alert(t('success'), t('language_updated'));
     } catch (error) {
@@ -332,7 +325,7 @@ export default function SettingsScreen() {
             <SettingItem
               icon={Globe}
               title={t('language')}
-              subtitle={language === 'fr' ? t('language_french') : t('language_english')}
+              subtitle={t('language_french')}
               onPress={() => setShowLanguageModal(true)}
             />
             <ToggleItem
@@ -449,22 +442,12 @@ export default function SettingsScreen() {
               
               <TouchableOpacity
                 style={[styles.languageOption, language === 'fr' && styles.languageOptionSelected]}
-                onPress={() => handleLanguageChange('fr')}
+                onPress={handleLanguageChange}
               >
                 <Text style={[styles.languageText, language === 'fr' && styles.languageTextSelected]}>
                   🇫🇷 {t('language_french')}
                 </Text>
                 {language === 'fr' && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.languageOption, language === 'en' && styles.languageOptionSelected]}
-                onPress={() => handleLanguageChange('en')}
-              >
-                <Text style={[styles.languageText, language === 'en' && styles.languageTextSelected]}>
-                  🇬🇧 {t('language_english')}
-                </Text>
-                {language === 'en' && <Text style={styles.checkmark}>✓</Text>}
               </TouchableOpacity>
             </TouchableOpacity>
           </TouchableOpacity>

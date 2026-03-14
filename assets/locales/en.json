@@ -104,4 +104,10 @@
   ,"settings_thanks_title": "Thanks!"
   ,"settings_rate_app_message": "We appreciate your support. Rate us on the App Store or Google Play."
   ,"settings_share_message": "Share Marché.cd with your friends!"
+  ,"home": {
+    "location": "Location",
+    "within": "Within",
+    "allListings": "All listings",
+    "searchRadius": "Search radius"
+  }
 }

@@ -104,4 +104,10 @@
   ,"settings_thanks_title": "Merci!"
   ,"settings_rate_app_message": "Nous apprécions votre soutien. Notez-nous sur l'App Store ou Google Play."
   ,"settings_share_message": "Partagez Marché.cd avec vos amis!"
+  ,"home": {
+    "location": "Localisation",
+    "within": "Dans un rayon de",
+    "allListings": "Toutes les annonces",
+    "searchRadius": "Rayon de recherche"
+  }
 }

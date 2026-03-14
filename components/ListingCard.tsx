@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
 View,
   Text,
@@ -27,6 +27,7 @@ type ListingCardProps = {
   isOwner?: boolean;
   isPromoted?: boolean;
   onDelete?: () => void;
+  onPress?: () => void;
 };
 
 const { width } = Dimensions.get('window');
@@ -44,11 +45,13 @@ export default function ListingCard({
   isVerified = false,
   isOwner = false,
   isPromoted = false,
-  onDelete
+  onDelete,
+  onPress,
 }: ListingCardProps) {
   const router = useRouter();
   const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(false);
+  const actionPressInProgressRef = useRef(false);
 
   useEffect(() => {
     if (!isOwner) {
@@ -76,8 +79,7 @@ export default function ListingCard({
     }
   };
 
-  const toggleFavorite = async (e: any) => {
-    e.stopPropagation();
+  const toggleFavorite = async () => {
     
     try {
       setLoading(true);
@@ -118,9 +120,7 @@ export default function ListingCard({
     }
   };
 
-  const handleDelete = async (e: any) => {
-    e.stopPropagation();
-    
+  const handleDelete = async () => {
     Alert.alert(
       'Supprimer l\'annonce',
       'Êtes-vous sûr de vouloir supprimer cette annonce ?',
@@ -132,21 +132,44 @@ export default function ListingCard({
           onPress: async () => {
             try {
               const { data: { user } } = await supabase.auth.getUser();
-              if (!user) return;
+              if (!user) {
+                Alert.alert('Erreur', 'Session invalide. Veuillez vous reconnecter.');
+                return;
+              }
 
-              const { error } = await supabase
+              // 1) Try hard delete first (preferred when DB policies/constraints allow it).
+              const { data: deletedRows, error: hardDeleteError } = await supabase
                 .from('listings')
                 .delete()
                 .eq('id', id)
-                .eq('seller_id', user.id);
+                .eq('seller_id', user.id)
+                .select('id');
 
-              if (error) throw error;
+              let deleteSucceeded = !hardDeleteError && (deletedRows?.length || 0) > 0;
+
+              // 2) Fallback to soft delete if hard delete is blocked in this environment.
+              if (!deleteSucceeded) {
+                const { data: softDeletedRows, error: softDeleteError } = await supabase
+                  .from('listings')
+                  .update({ status: 'removed' })
+                  .eq('id', id)
+                  .eq('seller_id', user.id)
+                  .select('id');
+
+                deleteSucceeded = !softDeleteError && (softDeletedRows?.length || 0) > 0;
+
+                if (!deleteSucceeded) {
+                  const reason = softDeleteError?.message || hardDeleteError?.message || 'Aucune ligne affectée';
+                  throw new Error(reason);
+                }
+              }
               
               if (onDelete) onDelete();
               Alert.alert('Succès', 'Annonce supprimée');
             } catch (error) {
               console.error('Error deleting listing:', error);
-              Alert.alert('Erreur', 'Impossible de supprimer l\'annonce');
+              const message = error instanceof Error ? error.message : 'Impossible de supprimer l\'annonce';
+              Alert.alert('Erreur', message || 'Impossible de supprimer l\'annonce');
             }
           },
         },
@@ -154,15 +177,29 @@ export default function ListingCard({
     );
   };
 
-  const handleEdit = (e: any) => {
-    e.stopPropagation();
+  const handleEdit = () => {
     router.push(`/edit-listing/${id}`);
+  };
+
+  const handleCardPress = () => {
+    // Guard against nested button taps triggering the card press.
+    if (actionPressInProgressRef.current) {
+      actionPressInProgressRef.current = false;
+      return;
+    }
+
+    if (onPress) {
+      onPress();
+      return;
+    }
+
+    router.push(`/listing/${id}`);
   };
 
   return (
     <TouchableOpacity
       style={[styles.card, status === 'sold' && styles.cardSold]}
-      onPress={() => router.push(`/listing/${id}`)}
+      onPress={handleCardPress}
       activeOpacity={0.7}
     >
       <View style={styles.imageContainer}>
@@ -172,13 +209,13 @@ export default function ListingCard({
           resizeMode="contain"
         />
         {status === 'sold' && (
-          <View style={styles.soldBadge}>
+          <View style={styles.soldBadge} pointerEvents="none">
             <Text style={styles.soldText}>VENDU</Text>
           </View>
         )}
         
         {isPromoted && status !== 'sold' && (
-          <View style={styles.promotedBadge}>
+          <View style={styles.promotedBadge} pointerEvents="none">
             <Text style={styles.promotedBadgeText}>⭐ PROMU</Text>
           </View>
         )}
@@ -187,14 +224,22 @@ export default function ListingCard({
           <View style={styles.ownerActions}>
             <TouchableOpacity
               style={styles.editButton}
-              onPress={handleEdit}
+              onPress={(e: any) => {
+                actionPressInProgressRef.current = true;
+                e?.stopPropagation?.();
+                handleEdit();
+              }}
               activeOpacity={0.7}
             >
               <Edit3 size={18} color="#1e293b" strokeWidth={2} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.deleteButton}
-              onPress={handleDelete}
+              onPress={(e: any) => {
+                actionPressInProgressRef.current = true;
+                e?.stopPropagation?.();
+                handleDelete();
+              }}
               activeOpacity={0.7}
             >
               <Trash2 size={18} color="#ef4444" strokeWidth={2} />
@@ -203,7 +248,11 @@ export default function ListingCard({
         ) : (
           <TouchableOpacity
             style={styles.favoriteButton}
-            onPress={toggleFavorite}
+            onPress={(e: any) => {
+              actionPressInProgressRef.current = true;
+              e?.stopPropagation?.();
+              toggleFavorite();
+            }}
             disabled={loading}
             activeOpacity={0.7}
           >
@@ -349,6 +398,8 @@ const styles = StyleSheet.create({
     top: 10,
     left: 10,
     right: 10,
+    zIndex: 20,
+    elevation: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },

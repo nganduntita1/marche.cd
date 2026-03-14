@@ -50,8 +50,7 @@ import { SearchFilterGuidance } from '@/components/guidance/SearchFilterGuidance
 export default function HomeScreen() {
   const { user } = useAuth();
   const { userLocation, currentCity, loading: locationLoading, refreshLocation, setManualLocation } = useLocation();
-  const { t, i18n } = useTranslation();
-  const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
+  const { t } = useTranslation();
   const guidance = useGuidance();
   const [listings, setListings] = useState<ListingWithDetails[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -262,8 +261,14 @@ export default function HomeScreen() {
           *,
           seller:users(*),
           category:categories(*)
-        `)
-        .eq('status', 'active');
+        `);
+
+      // Show active listings to everyone, plus owner's pending listings.
+      if (user?.id) {
+        query = query.or(`status.eq.active,and(status.eq.pending,seller_id.eq.${user.id})`);
+      } else {
+        query = query.eq('status', 'active');
+      }
 
       // Apply sorting
       if (sortBy === 'recent') {
@@ -460,7 +465,7 @@ export default function HomeScreen() {
           <TextInput
             ref={searchInputRef}
             style={styles.searchInput}
-            placeholder={isFrench ? 'Rechercher' : 'Search'}
+            placeholder="Rechercher"
             placeholderTextColor="#94a3b8"
             value={searchQuery}
             onChangeText={(text) => {
@@ -506,7 +511,7 @@ export default function HomeScreen() {
               !selectedCategory && styles.categoryChipTextActive,
             ]}
           >
-            {isFrench ? 'Tous' : 'All'}
+            Tous
           </Text>
         </TouchableOpacity>
         
@@ -568,7 +573,9 @@ export default function HomeScreen() {
           >
             <Ionicons name="radio-outline" size={16} color={Colors.textSecondary} />
             <Text style={styles.radiusText}>
-              {searchRadius ? `${t('home.within')} ${searchRadius} km` : t('home.allListings')}
+              {searchRadius
+                ? `${t('home.within', { defaultValue: 'Dans un rayon de' })} ${searchRadius} km`
+                : t('home.allListings', { defaultValue: 'Toutes les annonces' })}
             </Text>
             <Ionicons name="chevron-down" size={16} color={Colors.textSecondary} />
           </TouchableOpacity>
@@ -609,15 +616,7 @@ export default function HomeScreen() {
             const isOwner = user?.id === item.seller_id;
             
             return (
-              <TouchableOpacity 
-                key={item.id} 
-                style={styles.listingCardContainer}
-                onPress={() => {
-                  markInteraction();
-                  router.push(`/listing/${item.id}`);
-                }}
-                activeOpacity={0.9}
-              >
+              <View key={item.id} style={styles.listingCardContainer}>
                 <ListingCard
                   id={item.id}
                   title={item.title}
@@ -631,8 +630,12 @@ export default function HomeScreen() {
                   isOwner={isOwner}
                   isPromoted={item.is_promoted}
                   onDelete={loadListings}
+                  onPress={() => {
+                    markInteraction();
+                    router.push(`/listing/${item.id}`);
+                  }}
                 />
-              </TouchableOpacity>
+              </View>
             );
           })}
         </View>
@@ -696,11 +699,11 @@ export default function HomeScreen() {
                 <View style={styles.emptyStateIcon}>
                   <Package size={48} color="#cbd5e1" />
                 </View>
-                <Text style={styles.emptyStateTitle}>{isFrench ? 'Aucune annonce trouvée' : 'No listings found'}</Text>
+                <Text style={styles.emptyStateTitle}>Aucune annonce trouvée</Text>
                 <Text style={styles.emptyStateText}>
                   {searchQuery 
-                    ? (isFrench ? 'Aucun résultat pour votre recherche' : 'No results for your search')
-                    : (isFrench ? 'Essayez de modifier vos critères de recherche' : 'Try changing your search criteria')}
+                    ? 'Aucun résultat pour votre recherche'
+                    : 'Essayez de modifier vos critères de recherche'}
                 </Text>
                 {(searchQuery || selectedCategory) && (
                   <TouchableOpacity 
@@ -710,7 +713,7 @@ export default function HomeScreen() {
                       setSelectedCategory(null);
                     }}
                   >
-                    <Text style={styles.resetButtonText}>{isFrench ? 'Réinitialiser les filtres' : 'Reset filters'}</Text>
+                    <Text style={styles.resetButtonText}>Réinitialiser les filtres</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -738,11 +741,11 @@ export default function HomeScreen() {
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={styles.modalTitle}>{isFrench ? 'Filtres' : 'Filters'}</Text>
+            <Text style={styles.modalTitle}>Filtres</Text>
             
             {/* Price Range */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>{isFrench ? 'Fourchette de prix ($)' : 'Price range ($)'}</Text>
+              <Text style={styles.filterLabel}>Fourchette de prix ($)</Text>
               <View style={styles.priceInputRow}>
                 <TextInput
                   style={styles.priceInput}
@@ -766,7 +769,7 @@ export default function HomeScreen() {
 
             {/* Quick Price Ranges */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>{isFrench ? 'Gammes rapides' : 'Quick ranges'}</Text>
+              <Text style={styles.filterLabel}>Gammes rapides</Text>
               <View style={styles.quickRanges}>
                 <TouchableOpacity 
                   style={styles.quickRangeChip}
@@ -797,13 +800,13 @@ export default function HomeScreen() {
 
             {/* Sort Options */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>{isFrench ? 'Trier par' : 'Sort by'}</Text>
+              <Text style={styles.filterLabel}>Trier par</Text>
               <TouchableOpacity 
                 style={[styles.sortOption, sortBy === 'recent' && styles.sortOptionActive]}
                 onPress={() => setSortBy('recent')}
               >
                 <Text style={[styles.sortOptionText, sortBy === 'recent' && styles.sortOptionTextActive]}>
-                  {isFrench ? 'Plus récents' : 'Most recent'}
+                  Plus récents
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity 
@@ -811,7 +814,7 @@ export default function HomeScreen() {
                 onPress={() => setSortBy('price_low')}
               >
                 <Text style={[styles.sortOptionText, sortBy === 'price_low' && styles.sortOptionTextActive]}>
-                  {isFrench ? 'Prix croissant' : 'Price: low to high'}
+                  Prix croissant
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity 
@@ -819,7 +822,7 @@ export default function HomeScreen() {
                 onPress={() => setSortBy('price_high')}
               >
                 <Text style={[styles.sortOptionText, sortBy === 'price_high' && styles.sortOptionTextActive]}>
-                  {isFrench ? 'Prix décroissant' : 'Price: high to low'}
+                  Prix décroissant
                 </Text>
               </TouchableOpacity>
             </View>
@@ -834,7 +837,7 @@ export default function HomeScreen() {
                   setSortBy('recent');
                 }}
               >
-                <Text style={styles.modalResetButtonText}>{isFrench ? 'Réinitialiser' : 'Reset'}</Text>
+                <Text style={styles.modalResetButtonText}>Réinitialiser</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.applyButton}
@@ -843,7 +846,7 @@ export default function HomeScreen() {
                   setShowPriceModal(false);
                 }}
               >
-                <Text style={styles.applyButtonText}>{isFrench ? 'Appliquer' : 'Apply'}</Text>
+                <Text style={styles.applyButtonText}>Appliquer</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -867,7 +870,7 @@ export default function HomeScreen() {
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={styles.modalTitle}>{t('home.searchRadius')}</Text>
+            <Text style={styles.modalTitle}>{t('home.searchRadius', { defaultValue: 'Rayon de recherche' })}</Text>
             
             <View style={styles.filterSection}>
               <TouchableOpacity 
@@ -878,7 +881,7 @@ export default function HomeScreen() {
                 }}
               >
                 <Text style={[styles.radiusOptionText, searchRadius === null && styles.radiusOptionTextActive]}>
-                  {t('home.allListings')}
+                  {t('home.allListings', { defaultValue: 'Toutes les annonces' })}
                 </Text>
               </TouchableOpacity>
               
@@ -892,7 +895,7 @@ export default function HomeScreen() {
                   }}
                 >
                   <Text style={[styles.radiusOptionText, searchRadius === radius && styles.radiusOptionTextActive]}>
-                    {t('home.within')} {radius} km
+                    {t('home.within', { defaultValue: 'Dans un rayon de' })} {radius} km
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -923,48 +926,40 @@ export default function HomeScreen() {
       {showHomeTour && (() => {
         const tour = {
           id: 'home_tour',
-          name: 'Home Screen Tour',
+          name: 'Visite de l\'accueil',
           steps: [
             {
               id: 'home_step_1',
-              title: isFrench ? 'Bienvenue ! 🏠' : 'Welcome Home! 🏠',
-              message: isFrench 
-                ? 'C\'est ici que vous trouverez tous les articles disponibles. Explorons les fonctionnalités principales !'
-                : 'This is where you\'ll find all available items. Let\'s explore the main features!',
+              title: 'Bienvenue ! 🏠',
+              message: 'C\'est ici que vous trouverez tous les articles disponibles. Explorons les fonctionnalités principales !',
               placement: 'center' as const,
               showOverlay: true,
-              nextLabel: isFrench ? 'Montrez-moi' : 'Show me',
-              skipLabel: isFrench ? 'Passer' : 'Skip',
+              nextLabel: 'Montrez-moi',
+              skipLabel: 'Passer',
             },
             {
               id: 'home_step_2',
-              title: isFrench ? 'Barre de recherche' : 'Search Bar',
-              message: isFrench
-                ? 'Recherchez tout ce dont vous avez besoin - électronique, meubles, vêtements, et plus encore !'
-                : 'Search for anything you need - electronics, furniture, clothes, and more!',
+              title: 'Barre de recherche',
+              message: 'Recherchez tout ce dont vous avez besoin - électronique, meubles, vêtements, et plus encore !',
               placement: 'bottom' as const,
               showOverlay: true,
-              nextLabel: isFrench ? 'Suivant' : 'Next',
+              nextLabel: 'Suivant',
             },
             {
               id: 'home_step_3',
-              title: isFrench ? 'Filtre de localisation' : 'Location Filter',
-              message: isFrench
-                ? 'Voyez les articles près de vous ! Appuyez ici pour définir votre position et le rayon de recherche.'
-                : 'See items near you! Tap here to set your location and search radius.',
+              title: 'Filtre de localisation',
+              message: 'Voyez les articles près de vous ! Appuyez ici pour définir votre position et le rayon de recherche.',
               placement: 'bottom' as const,
               showOverlay: true,
-              nextLabel: isFrench ? 'Suivant' : 'Next',
+              nextLabel: 'Suivant',
             },
             {
               id: 'home_step_4',
-              title: isFrench ? 'Parcourir les annonces' : 'Browse Listings',
-              message: isFrench
-                ? 'Appuyez sur n\'importe quel article pour voir les détails, photos et contacter le vendeur. Bon shopping !'
-                : 'Tap any item to see details, photos, and contact the seller. Happy shopping!',
+              title: 'Parcourir les annonces',
+              message: 'Appuyez sur n\'importe quel article pour voir les détails, photos et contacter le vendeur. Bon shopping !',
               placement: 'center' as const,
               showOverlay: true,
-              nextLabel: isFrench ? 'Commencer' : 'Start Browsing',
+              nextLabel: 'Commencer',
             },
           ],
           triggerCondition: {
@@ -1030,12 +1025,10 @@ export default function HomeScreen() {
       {/* Inactivity Prompt */}
       {showInactivityPrompt && (
         <ContextualPrompt
-          message={isFrench 
-            ? 'Besoin d\'aide ? Appuyez sur n\'importe quel article pour voir plus de détails !'
-            : 'Need help? Tap any item to see more details!'}
+          message="Besoin d'aide ? Appuyez sur n'importe quel article pour voir plus de détails !"
           actions={[
             {
-              label: isFrench ? 'Compris' : 'Got it',
+              label: 'Compris',
               onPress: async () => {
                 await guidance.markTooltipDismissed('home_inactivity');
                 setShowInactivityPrompt(false);
