@@ -12,6 +12,9 @@ on:
 jobs:
   build-android-apk:
     runs-on: ubuntu-latest
+    environment: production
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN != '' && secrets.EXPO_TOKEN || vars.EXPO_TOKEN }}
 
     steps:
       - name: Checkout
@@ -30,7 +33,14 @@ jobs:
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+          token: ${{ env.EXPO_TOKEN }}
+
+      - name: Validate Expo token
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN is empty for this job. Add it as an Environment Secret/Variable in 'production' or as a Repository Secret."
+            exit 1
+          fi
 
       - name: Build Android APK with EAS
         run: |
