@@ -45,10 +45,10 @@ jobs:
       - name: Build Android APK with EAS
         run: |
           eas build --platform android --profile apk --non-interactive --wait --json > eas-build-result.json
-          node -e "const fs=require('fs');const result=JSON.parse(fs.readFileSync('eas-build-result.json','utf8'));const build=Array.isArray(result)?result[0]:result;if(!build||!build.id){throw new Error('Unable to resolve EAS build id from eas-build-result.json');}fs.appendFileSync(process.env.GITHUB_ENV, 'EAS_BUILD_ID='+build.id+'\\n');"
+          node -e "const fs=require('fs');const result=JSON.parse(fs.readFileSync('eas-build-result.json','utf8'));const build=Array.isArray(result)?result[0]:result;if(!build){throw new Error('Unable to resolve build object from eas-build-result.json');}const artifactUrl=build.artifacts?.buildUrl||build.artifacts?.applicationArchiveUrl||build.buildUrl||null;if(!artifactUrl){throw new Error('Unable to resolve artifact URL from EAS build result');}fs.appendFileSync(process.env.GITHUB_ENV, 'EAS_ARTIFACT_URL='+artifactUrl+'\\n');"
 
-      - name: Download latest Android APK
-        run: eas build:download --id "$EAS_BUILD_ID" --path marche-cd.apk --non-interactive
+      - name: Download Android APK artifact
+        run: curl -fL "$EAS_ARTIFACT_URL" -o marche-cd.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
