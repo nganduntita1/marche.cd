@@ -13,10 +13,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Phone, Eye, EyeOff, User, CheckSquare, Square, Mail, MapPin } from 'lucide-react-native';
+import { Phone, Eye, EyeOff, User, CheckSquare, Square, Mail, MapPin, Gift } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGuidance } from '@/contexts/GuidanceContext';
-import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
 import { GuidedTour } from '@/components/guidance/GuidedTour';
@@ -31,6 +30,7 @@ export default function RegisterScreen() {
   const [location, setLocation] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -118,16 +118,26 @@ export default function RegisterScreen() {
   })() : null;
 
   const generateEmail = async (firstName: string, lastName: string): Promise<string> => {
-    // Clean and normalize names
-    const cleanFirst = firstName.trim().toLowerCase().replace(/\s+/g, '');
-    const cleanLast = lastName.trim().toLowerCase().replace(/\s+/g, '');
-    const baseEmail = `${cleanFirst}.${cleanLast}@marchecd.com`;
+    // Clean and normalize names to safe email local-part characters only
+    const normalizeNamePart = (value: string) =>
+      value
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+
+    const cleanFirst = normalizeNamePart(firstName);
+    const cleanLast = normalizeNamePart(lastName);
+    const fallback = `user${Date.now().toString().slice(-6)}`;
+    const baseLocalPart = `${cleanFirst}.${cleanLast}`.replace(/^\.+|\.+$/g, '') || fallback;
+    const baseEmail = `${baseLocalPart}@marchecd.com`;
 
     // Check if email exists
     const { data: existingUsers } = await supabase
       .from('users')
       .select('email')
-      .like('email', `${cleanFirst}.${cleanLast}%@marchecd.com`);
+      .like('email', `${baseLocalPart}%@marchecd.com`);
 
     if (!existingUsers || existingUsers.length === 0) {
       return baseEmail;
@@ -139,7 +149,7 @@ export default function RegisterScreen() {
     let newEmail = baseEmail;
 
     while (emailExists) {
-      newEmail = `${cleanFirst}.${cleanLast}${counter}@marchecd.com`;
+      newEmail = `${baseLocalPart}${counter}@marchecd.com`;
       const exists = existingUsers.some(u => u.email === newEmail);
       if (!exists) {
         emailExists = false;
@@ -186,7 +196,7 @@ export default function RegisterScreen() {
       const finalEmail = email.trim() || await generateEmail(firstName, lastName);
       const fullName = `${firstName} ${lastName}`;
 
-      await signUp(finalEmail, password, fullName, phone, location);
+      await signUp(finalEmail, password, fullName, phone, location, referralCode.trim() || undefined);
       
       // Mark registration completed
       guidance.markActionCompleted('registration_completed');
@@ -252,6 +262,8 @@ export default function RegisterScreen() {
                   placeholderTextColor="#94a3b8"
                   value={firstName}
                   onChangeText={setFirstName}
+                  autoCorrect={false}
+                  autoComplete="off"
                 />
                 <View style={styles.inputIcon}>
                   <User size={20} color="#64748b" />
@@ -268,6 +280,8 @@ export default function RegisterScreen() {
                   placeholderTextColor="#94a3b8"
                   value={lastName}
                   onChangeText={setLastName}
+                  autoCorrect={false}
+                  autoComplete="off"
                 />
                 <View style={styles.inputIcon}>
                   <User size={20} color="#64748b" />
@@ -288,6 +302,8 @@ export default function RegisterScreen() {
                   onBlur={() => setEmailFocused(false)}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="off"
                 />
                 <View style={styles.inputIcon}>
                   <Mail size={20} color="#64748b" />
@@ -310,6 +326,8 @@ export default function RegisterScreen() {
                   onFocus={handlePhoneFocus}
                   onBlur={() => setPhoneFocused(false)}
                   keyboardType="phone-pad"
+                  autoCorrect={false}
+                  autoComplete="off"
                 />
                 <View style={styles.inputIcon}>
                   <Phone size={20} color="#64748b" />
@@ -328,11 +346,35 @@ export default function RegisterScreen() {
                   onChangeText={setLocation}
                   onFocus={handleLocationFocus}
                   onBlur={() => setLocationFocused(false)}
+                  autoCorrect={false}
+                  autoComplete="off"
                 />
                 <View style={styles.inputIcon}>
                   <MapPin size={20} color="#64748b" />
                 </View>
               </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>{txt('Quelqu\'un vous a référé ?', 'Was someone referred you to the app?')}</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="ex: MARCHE_ABC12"
+                  placeholderTextColor="#94a3b8"
+                  value={referralCode}
+                  onChangeText={setReferralCode}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  autoComplete="off"
+                />
+                <View style={styles.inputIcon}>
+                  <Gift size={20} color="#64748b" />
+                </View>
+              </View>
+              <Text style={styles.hint}>
+                {txt('Optionnel - Entrez le code du parrain pour obtenir des crédits bonus', 'Optional - Enter your referrer\'s code to get bonus credits')}
+              </Text>
             </View>
 
             <View style={styles.inputGroup}>
@@ -347,6 +389,8 @@ export default function RegisterScreen() {
                   onFocus={handlePasswordFocus}
                   onBlur={() => setPasswordFocused(false)}
                   secureTextEntry={!showPassword}
+                  autoCorrect={false}
+                  autoComplete="off"
                 />
                 <TouchableOpacity 
                   style={styles.inputIcon}
@@ -371,6 +415,8 @@ export default function RegisterScreen() {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
+                  autoCorrect={false}
+                  autoComplete="off"
                 />
                 <TouchableOpacity 
                   style={styles.inputIcon}

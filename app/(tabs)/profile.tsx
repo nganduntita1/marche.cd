@@ -15,7 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import ListingCard from '@/components/ListingCard';
 import CreditCard from '@/components/CreditCard';
-import { Bell, MapPin, Phone, Mail, Star, Package, Settings, BarChart3, HelpCircle } from 'lucide-react-native';
+import { Bell, MapPin, Phone, Mail, Star, Package, Settings, BarChart3, HelpCircle, Gift } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
 import { ProfileGuidance, ProgressTracker, ProfileSuggestions, RatingsExplanation, calculateProfileCompleteness } from '@/components/guidance';
@@ -423,6 +423,17 @@ export default function ProfileScreen() {
             <Text style={styles.actionButtonText}>
               {txt('Modifier mon profil', 'Edit profile')}
             </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.modernActionButton}
+            onPress={() => router.push('/referral-dashboard')}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Gift size={20} color="#fff" strokeWidth={2} />
+              <Text style={styles.actionButtonText}>
+                {txt('Mon programme de parrainage', 'My referral program')}
+              </Text>
+            </View>
           </TouchableOpacity>
           {(!user.phone || !user.location) && (
             <TouchableOpacity

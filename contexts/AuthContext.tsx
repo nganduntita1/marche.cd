@@ -9,7 +9,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, phone?: string, location?: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string, phone?: string, location?: string, referralCode?: string) => Promise<void>;
   signOut: () => Promise<void>;
   loadUserProfile: (userId: string) => Promise<void>;
   checkCredits: () => Promise<boolean>;
@@ -49,6 +49,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  const ensureUserProfile = async (
+    userId: string,
+    profile: { name: string; email: string; phone?: string; location?: string }
+  ) => {
+    const { data: existingProfile, error: existingError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    if (existingProfile) {
+      return existingProfile;
+    }
+
+    const { data: createdProfile, error: createError } = await supabase
+      .from('users')
+      .insert({
+        id: userId,
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone || '',
+        location: profile.location || '',
+        is_verified: false,
+        credits: 1,
+        total_spent: 0,
+      })
+      .select('*')
+      .single();
+
+    if (createError) throw createError;
+    return createdProfile;
+  };
+
   const loadUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -58,7 +93,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (error) throw error;
-      setUser(data);
+
+      if (data) {
+        setUser(data);
+        return;
+      }
+
+      // Fallback: if profile is missing, attempt self-heal for signed-in user.
+      const { data: authData } = await supabase.auth.getUser();
+      const authUser = authData?.user;
+
+      if (authUser && authUser.id === userId) {
+        const createdProfile = await ensureUserProfile(userId, {
+          name: (authUser.user_metadata?.name as string) || 'Utilisateur',
+          email: authUser.email || `${userId}@marchecd.com`,
+          phone: authUser.user_metadata?.phone as string | undefined,
+          location: authUser.user_metadata?.location as string | undefined,
+        });
+
+        setUser(createdProfile);
+      } else {
+        setUser(null);
+      }
     } catch (error) {
       console.error('Error loading user profile:', error);
     } finally {
@@ -66,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, name: string, phone?: string, location?: string) => {
+  const signUp = async (email: string, password: string, name: string, phone?: string, location?: string, referralCode?: string) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -76,29 +132,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             name,
             phone,
             location,
+            referral_code: referralCode || null,
           },
         },
       });
 
       if (error) throw error;
 
-      // Create initial user profile
-      if (data.user) {
+      // Create initial user profile when a session exists immediately.
+      // If email confirmation is enabled and session is null, DB trigger should create the row.
+      if (data.user && data.session) {
         try {
-          const { error: profileError } = await supabase
-            .from('users')
-            .insert({
-              id: data.user.id,
-              name,
-              email,
-              phone: phone || '',
-              location: location || '',
-              is_verified: false,
-              credits: 1, // Start with 1 free credit
-              total_spent: 0,
-            });
-
-          if (profileError) throw profileError;
+          await ensureUserProfile(data.user.id, {
+            name,
+            email,
+            phone,
+            location,
+          });
         } catch (profileErr) {
           console.error('Error creating initial profile:', profileErr);
           // Continue since the trigger should handle this
