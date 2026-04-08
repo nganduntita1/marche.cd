@@ -21,6 +21,7 @@ import { TextStyles } from '@/constants/Typography';
 import { GuidedTour } from '@/components/guidance/GuidedTour';
 import { Tooltip } from '@/components/guidance/Tooltip';
 import { useTranslation } from 'react-i18next';
+import { supabase } from '@/lib/supabase';
 
 export default function RegisterScreen() {
   const [firstName, setFirstName] = useState('');
@@ -139,7 +140,9 @@ export default function RegisterScreen() {
       .select('email')
       .like('email', `${baseLocalPart}%@marchecd.com`);
 
-    if (!existingUsers || existingUsers.length === 0) {
+    const existingEmails = (existingUsers ?? []).map((entry: { email: string }) => entry.email);
+
+    if (existingEmails.length === 0) {
       return baseEmail;
     }
 
@@ -150,7 +153,7 @@ export default function RegisterScreen() {
 
     while (emailExists) {
       newEmail = `${baseLocalPart}${counter}@marchecd.com`;
-      const exists = existingUsers.some(u => u.email === newEmail);
+      const exists = existingEmails.includes(newEmail);
       if (!exists) {
         emailExists = false;
       } else {

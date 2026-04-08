@@ -3,6 +3,9 @@ export interface User {
   name: string;
   phone: string;
   email?: string;
+  role?: 'user' | 'admin' | 'super_admin' | null;
+  user_role?: string;
+  is_admin?: boolean;
   location?: string;
   profile_picture?: string;
   is_verified: boolean;

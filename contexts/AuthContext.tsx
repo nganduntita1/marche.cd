@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { User, CreditPurchase } from '@/types/database';
@@ -7,9 +7,17 @@ import { Alert, Linking } from 'react-native';
 interface AuthContextType {
   session: Session | null;
   user: User | null;
+  isAdmin: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string, phone?: string, location?: string, referralCode?: string) => Promise<void>;
+  requestPasswordResetOtp: (identifier: string, method: 'email' | 'phone') => Promise<void>;
+  verifyResetOtpAndUpdatePassword: (
+    identifier: string,
+    otp: string | undefined,
+    newPassword: string,
+    method: 'email' | 'phone'
+  ) => Promise<void>;
   signOut: () => Promise<void>;
   loadUserProfile: (userId: string) => Promise<void>;
   checkCredits: () => Promise<boolean>;
@@ -19,10 +27,39 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const ADMIN_ROLES = ['admin', 'super_admin', 'owner'];
+
+const getRoleFromAuthUser = (authUser?: SupabaseUser | null): string | null => {
+  if (!authUser) return null;
+
+  const appRole =
+    (authUser.app_metadata?.role as string | undefined) ||
+    (authUser.app_metadata?.user_role as string | undefined);
+
+  const userRole =
+    (authUser.user_metadata?.role as string | undefined) ||
+    (authUser.user_metadata?.user_role as string | undefined);
+
+  return (appRole || userRole || null)?.toLowerCase() || null;
+};
+
+const isUserAdmin = (profile: User | null, authUser?: SupabaseUser | null): boolean => {
+  if ((profile as any)?.is_admin === true) return true;
+
+  // Check role column on users table (set via Supabase table editor)
+  const profileRole = ((profile as any)?.role || (profile as any)?.user_role || '').toString().toLowerCase();
+  if (ADMIN_ROLES.includes(profileRole)) return true;
+
+  const authRole = getRoleFromAuthUser(authUser);
+  return !!authRole && ADMIN_ROLES.includes(authRole);
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const isAdmin = useMemo(() => isUserAdmin(user, session?.user), [user, session]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -161,6 +198,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const recordLogin = async (userId: string) => {
+    try {
+      await supabase.from('user_logins').insert({ user_id: userId });
+    } catch {
+      // Non-critical — don't block sign-in if this fails
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -172,9 +217,93 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (data.session?.user) {
         await loadUserProfile(data.session.user.id);
+        void recordLogin(data.session.user.id);
       }
     } catch (error: any) {
       throw new Error(error.message || 'Error signing in');
+    }
+  };
+
+  const requestPasswordResetOtp = async (identifier: string, method: 'email' | 'phone') => {
+    try {
+      const normalizedIdentifier = identifier.trim();
+      const redirectTo =
+        process.env.EXPO_PUBLIC_PASSWORD_RESET_REDIRECT_URL || 'marchecd://auth/reset-password';
+
+      if (!normalizedIdentifier) {
+        throw new Error('Missing identifier');
+      }
+
+      const { error } = method === 'email'
+        ? await supabase.auth.resetPasswordForEmail(normalizedIdentifier, {
+            redirectTo,
+          })
+        : await supabase.auth.signInWithOtp({
+            phone: normalizedIdentifier,
+            options: { shouldCreateUser: false },
+          });
+
+      if (error) throw error;
+    } catch (error: any) {
+      if (method === 'phone') {
+        const message = (error?.message || '').toLowerCase();
+        if (message.includes('sms') || message.includes('phone') || message.includes('provider')) {
+          throw new Error('Phone reset is not configured yet. Please contact support or use your email if available.');
+        }
+      }
+
+      throw new Error(error?.message || 'Unable to send reset code');
+    }
+  };
+
+  const verifyResetOtpAndUpdatePassword = async (
+    identifier: string,
+    otp: string | undefined,
+    newPassword: string,
+    method: 'email' | 'phone'
+  ) => {
+    try {
+      const normalizedIdentifier = identifier.trim();
+      const normalizedOtp = otp?.trim();
+
+      if (!newPassword) {
+        throw new Error('Missing verification data');
+      }
+
+      if (normalizedOtp) {
+        const { error: verifyError } = method === 'email'
+          ? await supabase.auth.verifyOtp({
+              email: normalizedIdentifier,
+              token: normalizedOtp,
+              type: 'email',
+            })
+          : await supabase.auth.verifyOtp({
+              phone: normalizedIdentifier,
+              token: normalizedOtp,
+              type: 'sms',
+            });
+
+        if (verifyError) throw verifyError;
+      } else if (method === 'email') {
+        // Email recovery links create a temporary recovery session.
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          throw new Error('Please open the password reset link from your email first.');
+        }
+      } else {
+        throw new Error('OTP code is required for phone reset.');
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) throw updateError;
+
+      // Return users to a clean signed-out state after resetting credentials.
+      await supabase.auth.signOut();
+    } catch (error: any) {
+      throw new Error(error?.message || 'Unable to reset password');
     }
   };
 
@@ -264,9 +393,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         session,
         user,
+        isAdmin,
         loading,
         signIn,
         signUp,
+        requestPasswordResetOtp,
+        verifyResetOtpAndUpdatePassword,
         signOut,
         loadUserProfile,
         checkCredits,

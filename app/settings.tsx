@@ -28,6 +28,7 @@ import {
   Mail,
   Lock,
   Star,
+  BarChart3,
   Share2,
   FileText,
   X,
@@ -43,7 +44,7 @@ const LANGUAGE_MODE_STORAGE_KEY = 'app_language_mode';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, isAdmin, signOut } = useAuth();
   const { t } = useTranslation();
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -370,6 +371,17 @@ export default function SettingsScreen() {
               onPress={() => router.push('/privacy')}
             />
           </SettingSection>
+
+          {isAdmin && (
+            <SettingSection title="Administration">
+              <SettingItem
+                icon={BarChart3}
+                title="Dashboard admin"
+                subtitle="Suivre les KPIs de la plateforme"
+                onPress={() => router.push('/admin/dashboard')}
+              />
+            </SettingSection>
+          )}
 
           {/* App Info Section */}
           <SettingSection title={t('about')}>

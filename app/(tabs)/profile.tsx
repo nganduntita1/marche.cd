@@ -15,7 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import ListingCard from '@/components/ListingCard';
 import CreditCard from '@/components/CreditCard';
-import { Bell, MapPin, Phone, Mail, Star, Package, Settings, BarChart3, HelpCircle, Gift } from 'lucide-react-native';
+import { Bell, MapPin, Phone, Mail, Star, Package, Settings, BarChart3, HelpCircle, Gift, ShieldCheck } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
 import { ProfileGuidance, ProgressTracker, ProfileSuggestions, RatingsExplanation, calculateProfileCompleteness } from '@/components/guidance';
@@ -31,7 +31,7 @@ type Listing = {
 };
 
 export default function ProfileScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const { i18n } = useTranslation();
   const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
   const txt = (fr: string, en: string) => (isFrench ? fr : en);
@@ -283,6 +283,14 @@ export default function ProfileScreen() {
           >
             <BarChart3 size={24} color={Colors.primary} strokeWidth={2} />
           </TouchableOpacity>
+          {isAdmin && (
+            <TouchableOpacity
+              style={[styles.iconButton, styles.adminButton]}
+              onPress={() => router.push('/admin/dashboard')}
+            >
+              <ShieldCheck size={24} color="#fff" strokeWidth={2} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity 
             style={styles.iconButton}
             onPress={() => router.push('/notifications')}
@@ -576,6 +584,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+  },
+  adminButton: {
+    backgroundColor: Colors.primary,
   },
   notificationBadge: {
     position: 'absolute',
