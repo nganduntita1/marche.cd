@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Password reset — Open in app</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 24px; color: #111; }
+      .card { max-width: 720px; margin: 24px auto; padding: 20px; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,0.06); background: #fff; }
+      .actions { margin-top: 18px; }
+      button { background:#0b74ff; color:#fff; border:0; padding:10px 14px; border-radius:8px; font-size:16px; cursor:pointer }
+      a { color:#0b74ff }
+      pre { background:#f6f8fa; padding:12px; border-radius:6px; overflow:auto }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Password reset</h1>
+      <p>This page helps hand off Supabase password-recovery links to the mobile app. If your email client opened the link inside its built-in browser (e.g. Gmail in-app), press "Open in app" below.</p>
+
+      <div id="status">Preparing...</div>
+
+      <div class="actions">
+        <button id="openApp">Open in app</button>
+        <a id="copyLink" href="#" style="margin-left:12px;display:inline-block">Copy deep link</a>
+      </div>
+
+      <h3 style="margin-top:18px">If the app doesn't open</h3>
+      <ol>
+        <li>Tap the <strong>Share</strong> or <strong>Open in browser</strong> action in your mail app, then choose your device browser (Chrome / Safari) and open the link there.</li>
+        <li>From the browser, tap <em>Open in app</em> above.</li>
+      </ol>
+
+      <details style="margin-top:12px"><summary>Debug info</summary>
+        <pre id="debug"></pre>
+      </details>
+    </div>
+
+    <script>
+      // Parse tokens from hash (#access_token=...&refresh_token=...)
+      function parseFragment() {
+        const hash = window.location.hash || '';
+        const fragment = hash.startsWith('#') ? hash.substring(1) : hash;
+        const params = new URLSearchParams(fragment);
+        const obj = {};
+        for (const [k, v] of params.entries()) obj[k] = v;
+        return obj;
+      }
+
+      function makeAppUrl(params) {
+        // Build a query-string we will pass to the app route
+        const q = new URLSearchParams(params).toString();
+        // App scheme deep link used by the native app — keep in sync with your app
+        const appScheme = 'marchecd://auth/reset-password';
+        return appScheme + (q ? ('?' + q) : '');
+      }
+
+      const params = parseFragment();
+      const debug = document.getElementById('debug');
+      const status = document.getElementById('status');
+      const openBtn = document.getElementById('openApp');
+      const copyLink = document.getElementById('copyLink');
+
+      debug.textContent = JSON.stringify(params, null, 2);
+
+      if (!params || Object.keys(params).length === 0) {
+        status.textContent = 'No recovery token detected. If you were sent a recovery email, please open the exact link from your email.';
+      } else {
+        status.textContent = 'Recovery token found — press "Open in app" to continue.';
+      }
+
+      const appUrl = makeAppUrl(params);
+      openBtn.addEventListener('click', () => {
+        // Try to open the app scheme. Some in-app browsers block this; copy fallback shown below.
+        window.location.href = appUrl;
+        setTimeout(() => {
+          // If the browser didn't leave, show instructions (handled in page)
+          status.textContent = 'If the app did not open, try "Open in browser" in your mail client and open this page in Chrome/Safari.';
+        }, 1200);
+      });
+
+      copyLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigator.clipboard?.writeText(appUrl).then(() => {
+          copyLink.textContent = 'Copied!';
+        }).catch(() => {
+          copyLink.textContent = 'Copy failed';
+        });
+      });
+    </script>
+  </body>
+</html>
