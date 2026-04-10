@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import * as Notifications from 'expo-notifications';
 
 export default function Index() {
   const { session, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     // Request notification permissions on app startup
@@ -21,14 +22,14 @@ export default function Index() {
       }),
     });
 
-    if (!loading) {
+    if (!loading && pathname === '/') {
       if (session) {
         router.replace('/(tabs)');
       } else {
         router.replace('/auth/login');
       }
     }
-  }, [session, loading]);
+  }, [session, loading, pathname]);
 
   return (
     <View style={styles.container}>
