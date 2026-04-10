@@ -14,18 +14,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Mail, Phone } from 'lucide-react-native';
+import { Mail } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
 import { useTranslation } from 'react-i18next';
 
-type ResetMethod = 'email' | 'phone';
-
 export default function ForgotPasswordScreen() {
-  const [method, setMethod] = useState<ResetMethod>('email');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,28 +31,11 @@ export default function ForgotPasswordScreen() {
   const isFrench = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase().startsWith('fr');
   const txt = (fr: string, en: string) => (isFrench ? fr : en);
 
-  const identifier = useMemo(
-    () => (method === 'email' ? email.trim() : phone.trim()),
-    [email, method, phone]
-  );
+  const identifier = useMemo(() => email.trim(), [email]);
 
   const handleSendCode = async () => {
     if (!identifier) {
-      setError(
-        method === 'email'
-          ? txt('Veuillez entrer votre email', 'Please enter your email')
-          : txt('Veuillez entrer votre numéro', 'Please enter your phone number')
-      );
-      return;
-    }
-
-    if (method === 'phone' && !identifier.startsWith('+243') && !identifier.startsWith('0')) {
-      setError(
-        txt(
-          'Le numéro doit commencer par +243 ou 0',
-          'Phone number must start with +243 or 0'
-        )
-      );
+      setError(txt('Veuillez entrer votre email', 'Please enter your email'));
       return;
     }
 
@@ -65,31 +44,23 @@ export default function ForgotPasswordScreen() {
     setSuccess('');
 
     try {
-      await requestPasswordResetOtp(identifier, method);
+      await requestPasswordResetOtp(identifier, 'email');
       setSuccess(
-        method === 'email'
-          ? txt(
-              'Lien de reinitialisation envoye par email. Ouvrez ce lien pour continuer.',
-              'Reset link sent by email. Open that link to continue.'
-            )
-          : txt('Code envoyé par SMS. Vérifiez vos messages.', 'Code sent by SMS. Check your messages.')
+        txt(
+          'Lien de reinitialisation envoye par email. Ouvrez ce lien pour continuer.',
+          'Reset link sent by email. Open that link to continue.'
+        )
       );
     } catch (err: any) {
-      setError(err.message || txt('Impossible d\'envoyer le code', 'Unable to send reset code'));
+      setError(err.message || txt("Impossible d'envoyer le code", 'Unable to send reset code'));
     } finally {
       setLoading(false);
     }
   };
 
-  const goToReset = () => {
-    router.push(
-      `/auth/reset-password?method=${method}&identifier=${encodeURIComponent(identifier)}` as any
-    );
-  };
-
   const contactSupport = async () => {
     const message = txt(
-      'Bonjour, je n\'arrive pas a reinitialiser mon mot de passe sur Marche.cd. Pouvez-vous m\'aider ?',
+      "Bonjour, je n'arrive pas a reinitialiser mon mot de passe sur Marche.cd. Pouvez-vous m'aider ?",
       'Hello, I cannot reset my Marché.cd password. Can you help me?'
     );
     const whatsappUrl = `https://wa.me/27672727343?text=${encodeURIComponent(message)}`;
@@ -105,10 +76,7 @@ export default function ForgotPasswordScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <LinearGradient
             colors={['#60c882', Colors.primary, '#c7f9cc', '#00a85d', '#60c882']}
             start={{ x: 0, y: 0 }}
@@ -122,16 +90,12 @@ export default function ForgotPasswordScreen() {
               end={{ x: 1, y: 1 }}
               style={styles.meshOverlay}
             >
-              <Image
-                source={require('@/assets/images/logo.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
+              <Image source={require('@/assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
               <Text style={styles.welcomeText}>{txt('Mot de passe oublie ?', 'Forgot password?')}</Text>
               <Text style={styles.subtitle}>
                 {txt(
-                  'Choisissez email ou numero pour recevoir un code de reinitialisation.',
-                  'Choose email or phone to receive a reset code.'
+                  "Entrez votre adresse email pour recevoir un lien de réinitialisation.",
+                  'Enter your email address to receive a password reset link.'
                 )}
               </Text>
             </LinearGradient>
@@ -150,105 +114,37 @@ export default function ForgotPasswordScreen() {
               </View>
             ) : null}
 
-            <View style={styles.switchRow}>
-              <TouchableOpacity
-                style={[styles.switchButton, method === 'email' && styles.switchButtonActive]}
-                onPress={() => setMethod('email')}
-              >
-                <Text
-                  style={[styles.switchButtonText, method === 'email' && styles.switchButtonTextActive]}
-                >
-                  {txt('Email', 'Email')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.switchButton, method === 'phone' && styles.switchButtonActive]}
-                onPress={() => setMethod('phone')}
-              >
-                <Text
-                  style={[styles.switchButtonText, method === 'phone' && styles.switchButtonTextActive]}
-                >
-                  {txt('Numero', 'Phone')}
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>{txt('Adresse Email', 'Email Address')}</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="votre@email.com"
+                  placeholderTextColor="#94a3b8"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <View style={styles.inputIcon}>
+                  <Mail size={20} color="#64748b" />
+                </View>
+              </View>
             </View>
 
-            {method === 'email' ? (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>{txt('Adresse Email', 'Email Address')}</Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="votre@email.com"
-                    placeholderTextColor="#94a3b8"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <View style={styles.inputIcon}>
-                    <Mail size={20} color="#64748b" />
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>{txt('Numero de telephone', 'Phone number')}</Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={txt('+243 ou 0...', '+243 or 0...')}
-                    placeholderTextColor="#94a3b8"
-                    value={phone}
-                    onChangeText={setPhone}
-                    keyboardType="phone-pad"
-                    autoCorrect={false}
-                  />
-                  <View style={styles.inputIcon}>
-                    <Phone size={20} color="#64748b" />
-                  </View>
-                </View>
-                <Text style={styles.hint}>
-                  {txt(
-                    'Le reset par numero depend de la configuration SMS de Supabase.',
-                    'Phone reset depends on Supabase SMS provider configuration.'
-                  )}
-                </Text>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleSendCode}
-              disabled={loading}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? txt('Envoi...', 'Sending...') : txt('Envoyer le code', 'Send code')}
-              </Text>
+            <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleSendCode} disabled={loading}>
+              <Text style={styles.buttonText}>{loading ? txt('Envoi...', 'Sending...') : txt('Envoyer le code', 'Send code')}</Text>
             </TouchableOpacity>
-
-            {success && method === 'phone' ? (
-              <TouchableOpacity style={styles.secondaryButton} onPress={goToReset}>
-                <Text style={styles.secondaryButtonText}>
-                  {txt('J\'ai recu un code', 'I received a code')}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
 
             <TouchableOpacity style={styles.supportButton} onPress={contactSupport}>
               <Text style={styles.supportText}>
-                {txt(
-                  'Je n\'ai ni email actif ni SMS. Contacter le support',
-                  'I have no active email or SMS. Contact support'
-                )}
+                {txt("Je n'ai ni email actif ni SMS. Contacter le support", 'I have no active email or SMS. Contact support')}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/auth/login')}>
-              <Text style={styles.linkText}>
-                {txt('Retour a la connexion', 'Back to sign in')}
-              </Text>
+              <Text style={styles.linkText}>{txt('Retour a la connexion', 'Back to sign in')}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -326,30 +222,6 @@ const styles = StyleSheet.create({
     top: '50%',
     transform: [{ translateY: -10 }],
   },
-  switchRow: {
-    flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 20,
-  },
-  switchButton: {
-    flex: 1,
-    borderRadius: 10,
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  switchButtonActive: {
-    backgroundColor: '#ffffff',
-  },
-  switchButtonText: {
-    ...TextStyles.body,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  switchButtonTextActive: {
-    color: Colors.primary,
-  },
   button: {
     backgroundColor: Colors.primary,
     paddingVertical: 18,
@@ -369,19 +241,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     ...TextStyles.button,
     fontSize: 17,
-    fontWeight: '700',
-  },
-  secondaryButton: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  secondaryButtonText: {
-    color: Colors.primary,
-    fontSize: 16,
     fontWeight: '700',
   },
   supportButton: {

@@ -20,13 +20,11 @@ import Colors from '@/constants/Colors';
 import { TextStyles } from '@/constants/Typography';
 import { useTranslation } from 'react-i18next';
 
-type ResetMethod = 'email' | 'phone';
+type ResetMethod = 'email';
 
 export default function ResetPasswordScreen() {
   const params = useLocalSearchParams<{ identifier?: string; method?: string }>();
-  const initialMethod: ResetMethod = params.method === 'phone' ? 'phone' : 'email';
-
-  const [method, setMethod] = useState<ResetMethod>(initialMethod);
+  const [method] = useState<ResetMethod>('email');
   const [identifier, setIdentifier] = useState((params.identifier || '').toString());
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -71,12 +69,22 @@ export default function ResetPasswordScreen() {
   }, []);
 
   const handleResetPassword = async () => {
-    const needsOtp = method === 'phone' || !recoverySessionReady;
+    const needsOtp = !recoverySessionReady;
 
-    if ((needsOtp && (!normalizedIdentifier || !otp)) || !newPassword || !confirmPassword) {
-      setError(txt('Veuillez remplir tous les champs', 'Please fill in all fields'));
-      return;
-    }
+      if (!recoverySessionReady) {
+        setError(
+          txt(
+            'Veuillez ouvrir le lien de reinitialisation depuis votre email avant de definir un nouveau mot de passe.',
+            'Please open the password reset link from your email before setting a new password.'
+          )
+        );
+        return;
+      }
+
+      if (!newPassword || !confirmPassword) {
+        setError(txt('Veuillez remplir tous les champs', 'Please fill in all fields'));
+        return;
+      }
 
     if (newPassword !== confirmPassword) {
       setError(txt('Les mots de passe ne correspondent pas', 'Passwords do not match'));
@@ -150,70 +158,16 @@ export default function ResetPasswordScreen() {
               </View>
             ) : null}
 
-            <View style={styles.switchRow}>
-              <TouchableOpacity
-                style={[styles.switchButton, method === 'email' && styles.switchButtonActive]}
-                onPress={() => setMethod('email')}
-              >
-                <Text
-                  style={[styles.switchButtonText, method === 'email' && styles.switchButtonTextActive]}
-                >
-                  {txt('Email', 'Email')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.switchButton, method === 'phone' && styles.switchButtonActive]}
-                onPress={() => setMethod('phone')}
-              >
-                <Text
-                  style={[styles.switchButtonText, method === 'phone' && styles.switchButtonTextActive]}
-                >
-                  {txt('Numero', 'Phone')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {(method === 'phone' || !recoverySessionReady) ? (
-              <>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>
-                    {method === 'email' ? txt('Adresse Email', 'Email Address') : txt('Numero de telephone', 'Phone number')}
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={
-                      method === 'email' ? 'votre@email.com' : txt('+243 ou 0...', '+243 or 0...')
-                    }
-                    placeholderTextColor="#94a3b8"
-                    value={identifier}
-                    onChangeText={setIdentifier}
-                    autoCapitalize="none"
-                    keyboardType={method === 'email' ? 'email-address' : 'phone-pad'}
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{txt('Code OTP', 'OTP code')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={txt('Entrez le code recu', 'Enter received code')}
-                    placeholderTextColor="#94a3b8"
-                    value={otp}
-                    onChangeText={setOtp}
-                    keyboardType="number-pad"
-                  />
-                </View>
-              </>
-            ) : (
+            {!recoverySessionReady ? (
               <View style={styles.infoContainer}>
                 <Text style={styles.infoText}>
                   {txt(
-                    'Lien de reinitialisation detecte. Vous pouvez definir un nouveau mot de passe directement.',
-                    'Reset link detected. You can set your new password directly.'
+                    'Veuillez ouvrir le lien de reinitialisation depuis votre email avant de definir un nouveau mot de passe.',
+                    'Please open the password reset link from your email before setting a new password.'
                   )}
                 </Text>
               </View>
-            )}
+            ) : null}
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>{txt('Nouveau mot de passe', 'New password')}</Text>
