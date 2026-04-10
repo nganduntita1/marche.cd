@@ -2,7 +2,8 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { User, CreditPurchase } from '@/types/database';
-import { Alert, Linking } from 'react-native';
+import { Alert } from 'react-native';
+import * as Linking from 'expo-linking';
 
 interface AuthContextType {
   session: Session | null;
@@ -227,8 +228,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const requestPasswordResetOtp = async (identifier: string, method: 'email' | 'phone') => {
     try {
       const normalizedIdentifier = identifier.trim();
-      const redirectTo =
-        process.env.EXPO_PUBLIC_PASSWORD_RESET_REDIRECT_URL || 'marchecd://auth/reset-password';
+      // Use Linking.createURL to automatically handle dev (Expo Go exp://) and prod (marchecd://) schemes
+      const redirectTo = Linking.createURL('/auth/reset-password');
 
       if (!normalizedIdentifier) {
         throw new Error('Missing identifier');
