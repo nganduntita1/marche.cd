@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.JPG",
+      "image": "./assets/images/icon.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#00b86b"
     },
@@ -23,9 +23,9 @@
     "android": {
       "package": "com.marche.cd",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/icon.jpg",
         "backgroundColor": "#00b86b",
-        "monochromeImage": "./assets/images/icon.png"
+        "monochromeImage": "./assets/images/icon.jpg"
       },
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -35,7 +35,7 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/favicon.JPG"
+      "favicon": "./assets/images/favicon.jpg"
     },
     "plugins": [
       "expo-router",
